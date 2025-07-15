@@ -1,20 +1,13 @@
-# spark_news_etl
+# Pyspark - News ETL Project 
 
-Goal: A script that turns raw news → clean data.
+**Goal**: 
+Ingest news from multiple RSS feeds, store and process them, and then display the day's news using a basic web app.
 
+**Project Requirements**:
 
-🔰 STAGE 1: Local MVP (Minimal Viable Product)
-
-This gets the core idea working before adding the cloud.
-
-Steps:
-
-1️⃣	Collect a few news articles	(Use RSS or NewsAPI)
-
-2️⃣	Save them as a JSON file (raw_news.json)
-
-3️⃣	Write and run a local Spark ETL script
-
-4️⃣	Save cleaned results as Parquet
-
-✅ Output: cleaned_news.parquet locally.
+* Ingest news from multiple sources (RSS feeds or APIs).
+* Process and store articles in a database.
+* Categorize news (e.g., by topic or keyword).
+* Display news in a basic web app or via an API.
+* Utilize PySpark for data processing.
+* Project must be fully Dockerized.
