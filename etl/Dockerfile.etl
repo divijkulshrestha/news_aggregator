@@ -1,0 +1,21 @@
+# etl/Dockerfile.etl
+FROM jupyter/pyspark-notebook:latest # Or a specific version like 2024-04-20
+
+WORKDIR /app
+
+# Copy your Python dependencies for the ETL script
+COPY ./etl/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy your PySpark ETL script and associated files (e.g., feeds.json)
+COPY ./etl/ /app/
+
+# Copy PostgreSQL JDBC driver
+# IMPORTANT: Make sure you have downloaded the JAR and placed it in your local ./jars/ directory
+# COPY ./jars/postgresql-42.X.X.jar /usr/local/spark/jars/ # The jupyter/pyspark-notebook image expects jars here
+
+# If you want to run your ETL script immediately when the container starts for testing:
+# CMD ["spark-submit", "--master", "spark://spark-master:7077", "/app/ingest_and_process.py"]
+
+# If you want to use it interactively for development (and submit jobs manually):
+# CMD ["start-notebook.sh", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
