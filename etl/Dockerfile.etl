@@ -1,14 +1,14 @@
 # etl/Dockerfile.etl
-FROM jupyter/pyspark-notebook:latest # Or a specific version like 2024-04-20
+FROM jupyter/pyspark-notebook:latest 
 
 WORKDIR /app
 
 # Copy your Python dependencies for the ETL script
-COPY ./etl/requirements.txt /app/requirements.txt
+COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy your PySpark ETL script and associated files (e.g., feeds.json)
-COPY ./etl/ /app/
+COPY . /app/
 
 # Copy PostgreSQL JDBC driver
 # IMPORTANT: Make sure you have downloaded the JAR and placed it in your local ./jars/ directory

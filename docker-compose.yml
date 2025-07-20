@@ -1,68 +1,16 @@
-version: '3.8'
-
 services:
-  # Spark Master Service
-  spark-master:
-    image: bitnami/spark:3.5.1
-    hostname: spark-master
-    environment:
-      SPARK_MODE: master
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no" # For simplicity in dev, consider enabling in prod
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
-      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
-      SPARK_SSL_ENABLED: "no"
-    ports:
-      - "8080:8080" # Spark Master UI
-      - "7077:7077" # Spark Master communication
-
-  # Spark Worker Service
-  spark-worker:
-    image: bitnami/spark:3.5.1
-    hostname: spark-worker
-    environment:
-      SPARK_MODE: worker
-      SPARK_MASTER_URL: spark://spark-master:7077 # Connects to the master
-      SPARK_WORKER_MEMORY: 1G # Adjust as needed
-      SPARK_WORKER_CORES: 1 # Adjust as needed
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
-      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
-      SPARK_SSL_ENABLED: "no"
-    depends_on:
-      - spark-master
-
-  # ETL Service (PySpark client to submit jobs)
+  # ETL Service 
   etl-service:
     build:
       context: ./etl
       dockerfile: Dockerfile.etl
-    depends_on:
-      spark-master:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
     environment:
-      # SPARK_MASTER_URL is already configured in jupyter/pyspark-notebook via SPARK_MASTER environment variable
-      # But explicitly setting it here ensures it's correct for the spark-submit command
-      SPARK_MASTER: spark://spark-master:7077
-      JUPYTER_ENABLE_LAB: "yes" # If you prefer JupyterLab
+      JUPYTER_ENABLE_LAB: "yes" 
     ports:
-      - "8888:8888" # Expose Jupyter notebook port if you want to access it
+      - "8888:8888" 
     volumes:
-      - ./etl:/app # Mount your etl scripts for easy modification
-      - ./jars:/app/jars # Still good practice to mount, even if you copy to spark/jars inside Dockerfile
-      # If you place the JAR directly in /usr/local/spark/jars inside the Dockerfile, this specific volume mount for jars might not be strictly necessary, but can be useful for debugging or if you later decide to load jars from /app/jars.
-    command: >
-      bash -c "
-      /usr/local/bin/start-notebook.sh --ip=0.0.0.0 --port=8888 --no-browser --allow-root &
-      sleep 10 && # Give Jupyter time to start
-      spark-submit --master $SPARK_MASTER /app/ingest_and_process.py
-      "
-    # Or, if you want the ETL to run once and then the container exits (good for scheduled cron jobs):
-    # command: ["spark-submit", "--master", "spark://spark-master:7077", "/app/ingest_and_process.py"]
-
-    # For cron-based scheduling, you'd add cron setup here or within the Dockerfile.etl
-    # If running cron, the command would be something like: sh -c "cron -f && tail -F /var/log/cron.log"
-    
+      - ./etl:/app 
+      - ./data:/app/data     
+    command: ["spark-submit", "/app/ingest_and_process.py"]
 volumes:
   etl-service:
