@@ -25,6 +25,9 @@ spark = SparkSession.builder \
 
 print("Spark Session initialized in local mode.")
 
+# Before parsing
+spark.conf.set("spark.sql.legacy.timeParserPolicy", "LEGACY")
+
 # --- Helper Function to Fetch and Parse a Single RSS Feed ---
 def fetch_and_parse_feed(url):
     """Fetches and parses a single RSS feed, returning a list of article dictionaries."""
@@ -40,6 +43,8 @@ def fetch_and_parse_feed(url):
             link = getattr(entry, 'link', 'No Link').replace('\n', ' ').strip()
             published = getattr(entry, 'published', None)
             summary = getattr(entry, 'summary', getattr(entry, 'description', 'No Summary')).replace('\n', ' ').strip()
+            
+            print(published, title, link)
 
             full_content = None
             if link and link != "No Link":
@@ -126,7 +131,7 @@ if __name__ == "__main__":
     # 2. Transformation (Basic Cleaning & Duplication Handling)
     processed_df = raw_df \
         .withColumn("ingestion_timestamp", current_timestamp()) \
-        .withColumn("published_date", to_timestamp(raw_df["published_date"], "yyyy-MM-dd HH:mm:ss Z")) # Attempt to parse common RSS date format
+        .withColumn("published_date", to_timestamp(raw_df["published_date"], "EEE, dd MMM yyyy HH:mm:ss")) # Attempt to parse common RSS date format
 
     # Handle common HTML entities in text (basic)
     from pyspark.sql.functions import lit, regexp_replace

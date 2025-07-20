@@ -10,7 +10,14 @@ services:
       - "8888:8888" 
     volumes:
       - ./etl:/app 
-      - ./data:/app/data     
-    command: ["spark-submit", "/app/ingest_and_process.py"]
-volumes:
-  etl-service:
+      - ./data:/app/data    
+      - ./container_logs:/app/container_logs 
+    command: |
+      bash -c '
+        /usr/local/bin/start-notebook.sh --ip=0.0.0.0 --port=8888 --no-browser --allow-root &
+        sleep 15
+        echo "Running PySpark ETL job..."
+        spark-submit /app/ingest_and_process.py > "/app/container_logs/etl_run_$(date +%Y%m%d_%H%M%S).log" 2>&1
+        echo "PySpark ETL job finished. Jupyter is still running."
+        tail -f /dev/null
+      '
