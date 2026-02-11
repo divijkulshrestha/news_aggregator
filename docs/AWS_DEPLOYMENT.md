@@ -2,34 +2,59 @@
 
 Complete guide for deploying the Personal News Aggregator on AWS infrastructure.
 
+> 💡 **See Also:** [Project Implementation Plan](PROJECT_PLAN.md) for the complete roadmap from local development to production deployment.
+
 ## Architecture Overview
 
-```
-┌─────────────────┐
-│  EventBridge    │  (Schedule: Every hour)
-│   (Scheduler)   │
-└────────┬────────┘
-         │ Triggers
-         ▼
-┌─────────────────┐      ┌──────────────────┐
-│   ECS Task      │      │   RDS PostgreSQL │
-│  (ETL Runner)   │─────▶│    (Database)    │
-└─────────────────┘      └────────┬─────────┘
-                                  │
-                                  │
-┌─────────────────┐               │
-│  ECS Fargate    │               │
-│  (FastAPI App)  │──────────────┘
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   ALB (Optional)│
-│  Load Balancer  │
-└────────┬────────┘
-         │
-         ▼
-     Internet
+```mermaid
+graph TB
+    subgraph Internet
+        User[User Browser]
+    end
+    
+    subgraph AWS Cloud
+        subgraph Compute
+            EB[EventBridge<br/>Hourly Schedule]
+            ECS1[ECS Fargate<br/>API Service]
+            ECS2[ECS Task<br/>ETL Runner]
+        end
+        
+        subgraph Storage
+            ECR[ECR<br/>Container Registry]
+            RDS[(RDS PostgreSQL<br/>Database)]
+        end
+        
+        subgraph Optional
+            ALB[Application<br/>Load Balancer]
+            CF[CloudFront<br/>CDN]
+        end
+        
+        subgraph Monitoring
+            CW[CloudWatch<br/>Logs & Metrics]
+        end
+    end
+    
+    User -->|HTTPS| ALB
+    ALB --> ECS1
+    ECS1 -->|Read/Write| RDS
+    
+    EB -.Trigger.-> ECS2
+    ECS2 -->|Fetch & Store| RDS
+    
+    ECS1 -->|Pull Image| ECR
+    ECS2 -->|Pull Image| ECR
+    
+    ECS1 -->|Logs| CW
+    ECS2 -->|Logs| CW
+    RDS -->|Metrics| CW
+    
+    style RDS fill:#4CAF50
+    style ECS1 fill:#2196F3
+    style ECS2 fill:#FF9800
+    style EB fill:#9C27B0
+    style ECR fill:#00BCD4
+    style CW fill:#FFC107
+    style ALB fill:#E91E63
 ```
 
 ## Cost Estimate
@@ -52,6 +77,30 @@ Complete guide for deploying the Personal News Aggregator on AWS infrastructure.
 - AWS CLI installed and configured
 - Docker Desktop (for local testing)
 - Basic knowledge of AWS Console
+
+## Deployment Workflow
+
+```mermaid
+flowchart TD
+    Start([Start Deployment]) --> RDS[1. Create RDS PostgreSQL]
+    RDS --> ECR[2. Create ECR Repository]
+    ECR --> Build[3. Build Docker Image]
+    Build --> Push[4. Push to ECR]
+    Push --> Cluster[5. Create ECS Cluster]
+    Cluster --> Task[6. Create Task Definitions]
+    Task --> Service[7. Create ECS Service for API]
+    Service --> EB[8. Setup EventBridge Schedule]
+    EB --> Init[9. Run Initial ETL]
+    Init --> Test[10. Test Application]
+    Test --> Monitor[11. Setup Monitoring]
+    Monitor --> End([Deployment Complete])
+    
+    style Start fill:#4CAF50
+    style End fill:#4CAF50
+    style RDS fill:#FF9800
+    style Service fill:#2196F3
+    style Test fill:#9C27B0
+```
 
 ## Step-by-Step Deployment
 

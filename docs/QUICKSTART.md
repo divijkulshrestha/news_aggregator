@@ -2,6 +2,24 @@
 
 Get up and running with the Personal News Aggregator in minutes!
 
+## Setup Flow
+
+```mermaid
+flowchart LR
+    A[Install<br/>Dependencies] --> B[Start<br/>PostgreSQL]
+    B --> C[Initialize<br/>Database]
+    C --> D[Run<br/>ETL]
+    D --> E[Start<br/>API Server]
+    E --> F[Open<br/>Browser]
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style C fill:#fff3e0
+    style D fill:#e8f5e9
+    style E fill:#fce4ec
+    style F fill:#c8e6c9
+```
+
 ## Quick Setup (Docker Compose)
 
 The fastest way to get started:

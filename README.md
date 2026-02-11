@@ -11,31 +11,52 @@ A personalized news aggregation platform that collects articles from curated RSS
 - 🔄 **Auto-refresh**: Scheduled ETL jobs keep content fresh
 - 🧹 **Auto-cleanup**: Removes articles older than 7 days
 
+## Data Flow
+
+```mermaid
+sequenceDiagram
+    participant RSS as RSS Feeds
+    participant ETL as ETL Pipeline
+    participant DB as PostgreSQL
+    participant API as FastAPI
+    participant UI as Frontend
+    participant User as User
+    
+    Note over ETL: Runs every hour
+    ETL->>RSS: Fetch articles
+    RSS-->>ETL: XML/RSS data
+    ETL->>ETL: Parse & clean
+    ETL->>DB: Insert new articles
+    
+    User->>UI: Open website
+    UI->>API: GET /api/articles?category=tech&time=1d
+    API->>DB: Query articles
+    DB-->>API: Article data
+    API-->>UI: JSON response
+    UI->>User: Display articles
+    
+    Note over DB: Auto-cleanup old articles
+```
+
 ## Architecture
 
-```
-┌─────────────┐
-│  RSS Feeds  │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐      ┌──────────────┐
-│ ETL Process │─────▶│ PostgreSQL   │
-│  (Pandas)   │      │   Database   │
-└─────────────┘      └──────┬───────┘
-                            │
-                            ▼
-                     ┌──────────────┐
-                     │  FastAPI     │
-                     │   Backend    │
-                     └──────┬───────┘
-                            │
-                            ▼
-                     ┌──────────────┐
-                     │  Frontend    │
-                     │  (HTML/CSS/  │
-                     │  JavaScript) │
-                     └──────────────┘
+```mermaid
+flowchart TD
+    A[RSS Feeds<br/>Reuters, BBC, Guardian, NPR] --> B[ETL Process<br/>Pandas + Python]
+    B --> C[(PostgreSQL<br/>Database)]
+    C --> D[FastAPI Backend<br/>REST API]
+    D --> E[Frontend<br/>HTML/CSS/JavaScript]
+    E --> F[User Browser]
+    
+    G[EventBridge/Cron] -.Triggers Every Hour.-> B
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#e8f5e9
+    style D fill:#f3e5f5
+    style E fill:#fce4ec
+    style F fill:#fff9c4
+    style G fill:#ffebee
 ```
 
 ## Local Development
@@ -120,27 +141,43 @@ See [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md) for complete deployment gui
 
 ## Project Structure
 
-```
-news_etl/
-├── backend/              # FastAPI application
-│   ├── app.py           # Main API server
-│   └── database.py      # Database models & connection
-├── etl/                  # ETL pipeline
-│   ├── feeds.json       # RSS feed configuration
-│   ├── etl_news.py      # ETL runner
-│   └── ingest_and_process.py  # Core ETL logic
-├── frontend/             # Web interface
-│   ├── index.html       # Main HTML
-│   ├── styles.css       # Styling
-│   └── app.js           # Frontend logic
-├── scripts/              # Utility scripts
-│   └── run_etl.py       # Scheduled ETL runner
-├── docs/                 # Documentation
-│   ├── QUICKSTART.md    # Quick start guide
-│   └── AWS_DEPLOYMENT.md # AWS deployment guide
-├── Dockerfile            # Container image
-├── docker-compose.yml    # Local development setup
-└── requirements.txt      # Python dependencies
+```mermaid
+graph LR
+    A[news_etl/] --> B[backend/]
+    A --> C[etl/]
+    A --> D[frontend/]
+    A --> E[scripts/]
+    A --> F[docs/]
+    A --> G[Config Files]
+    
+    B --> B1[app.py<br/>FastAPI Server]
+    B --> B2[database.py<br/>SQLAlchemy Models]
+    
+    C --> C1[feeds.json<br/>RSS Sources]
+    C --> C2[etl_news.py<br/>ETL Runner]
+    C --> C3[ingest_and_process.py<br/>Core Logic]
+    
+    D --> D1[index.html]
+    D --> D2[styles.css]
+    D --> D3[app.js]
+    
+    E --> E1[run_etl.py<br/>Scheduler]
+    
+    F --> F1[QUICKSTART.md]
+    F --> F2[AWS_DEPLOYMENT.md]
+    F --> F3[PROJECT_PLAN.md]
+    
+    G --> G1[Dockerfile]
+    G --> G2[docker-compose.yml]
+    G --> G3[requirements.txt]
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style C fill:#fff3e0
+    style D fill:#e8f5e9
+    style E fill:#fce4ec
+    style F fill:#fff9c4
+    style G fill:#f1f8e9
 ```
 
 ## API Endpoints
@@ -204,6 +241,7 @@ pytest etl/tests/
 ## Documentation
 
 - 📖 [Quick Start Guide](docs/QUICKSTART.md) - Get started in 5 minutes
+- 📋 [Project Implementation Plan](docs/PROJECT_PLAN.md) - Complete roadmap from local dev to AWS
 - ☁️ [AWS Deployment Guide](docs/AWS_DEPLOYMENT.md) - Deploy to AWS cloud
 - 🔌 [API Documentation](http://localhost:8000/docs) - Interactive API docs (when server is running)
 
