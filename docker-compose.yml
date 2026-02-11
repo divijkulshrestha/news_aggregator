@@ -1,61 +1,66 @@
-services:
-  # ETL Service - Running PySpark
-  etl-service:
-    build:
-      context: ./etl
-      dockerfile: Dockerfile.etl
-    environment:
-      JUPYTER_ENABLE_LAB: "yes" 
-    ports:
-      - "8888:8888" 
-    volumes:
-      # - ./etl:/app 
-      - ./data:/app/data    
-      - ./container_logs:/app/container_logs
-      - ./jars:/usr/local/spark/jars/
-    command: ["/app/run_etl_job.sh"]
-    networks:
-      - news_network
-    depends_on:
-      - db
+version: '3.8'
 
-  # PostgreSQL Database Service
+services:
+  # PostgreSQL Database
   db:
-    image: postgres:16-alpine # Using a recent, lightweight Postgres image
+    image: postgres:16-alpine
     environment:
       POSTGRES_DB: news_db
       POSTGRES_USER: news_user
       POSTGRES_PASSWORD: news_password
     volumes:
-      - pgdata:/var/lib/postgresql/data # Persistent volume for DB data
-      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql # Optional: To run initial schema script
+      - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432" 
-    networks:
-      - news_network
-    healthcheck: 
+      - "5432:5432"
+    healthcheck:
       test: ["CMD-SHELL", "pg_isready -U news_user -d news_db"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  # PgAdmin Service
-  pgadmin:
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin_password
-    ports:
-      - "8080:80" # Access PgAdmin at http://localhost:8080
     networks:
       - news_network
-    depends_on:
-      - db
 
-# Define custom network and named volume
+  # FastAPI Backend
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://news_user:news_password@db:5432/news_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./etl:/app/etl
+    networks:
+      - news_network
+    restart: unless-stopped
+
+  # ETL Job (runs periodically)
+  # Uncomment the command to run ETL on container start
+  # For scheduled runs, use cron or external scheduler
+  etl:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://news_user:news_password@db:5432/news_db
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./etl:/app/etl
+      - ./backend:/app/backend
+      - ./scripts:/app/scripts
+    networks:
+      - news_network
+    # Run ETL once and exit
+    command: python scripts/run_etl.py
+    restart: "no"
+
+volumes:
+  pgdata:
+
 networks:
   news_network:
     driver: bridge
-
-volumes:
-  pgdata: # Named volume for PostgreSQL data persistence

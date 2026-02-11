@@ -1,10 +1,50 @@
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
 .env
-/data/
-/etl/hello.py
-/etl/etl_news.py
-/etl/Testing ETL.ipynb
-/jars/
-/container_logs/
+.env.local
+
+# Database
+pgdata/
+*.db
+*.sqlite
+
+# Logs
+container_logs/
+*.log
+
+# Data
+data/
+!data/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
 
