@@ -1,5 +1,5 @@
 services:
-  # ETL Service 
+  # ETL Service - Running PySpark
   etl-service:
     build:
       context: ./etl
@@ -9,15 +9,53 @@ services:
     ports:
       - "8888:8888" 
     volumes:
-      - ./etl:/app 
+      # - ./etl:/app 
       - ./data:/app/data    
-      - ./container_logs:/app/container_logs 
-    command: |
-      bash -c '
-        /usr/local/bin/start-notebook.sh --ip=0.0.0.0 --port=8888 --no-browser --allow-root &
-        sleep 15
-        echo "Running PySpark ETL job..."
-        spark-submit /app/ingest_and_process.py > "/app/container_logs/etl_run_$(date +%Y%m%d_%H%M%S).log" 2>&1
-        echo "PySpark ETL job finished. Jupyter is still running."
-        tail -f /dev/null
-      '
+      - ./container_logs:/app/container_logs
+      - ./jars:/usr/local/spark/jars/
+    command: ["/app/run_etl_job.sh"]
+    networks:
+      - news_network
+    depends_on:
+      - db
+
+  # PostgreSQL Database Service
+  db:
+    image: postgres:16-alpine # Using a recent, lightweight Postgres image
+    environment:
+      POSTGRES_DB: news_db
+      POSTGRES_USER: news_user
+      POSTGRES_PASSWORD: news_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data # Persistent volume for DB data
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql # Optional: To run initial schema script
+    ports:
+      - "5432:5432" 
+    networks:
+      - news_network
+    healthcheck: 
+      test: ["CMD-SHELL", "pg_isready -U news_user -d news_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # PgAdmin Service
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+    ports:
+      - "8080:80" # Access PgAdmin at http://localhost:8080
+    networks:
+      - news_network
+    depends_on:
+      - db
+
+# Define custom network and named volume
+networks:
+  news_network:
+    driver: bridge
+
+volumes:
+  pgdata: # Named volume for PostgreSQL data persistence

@@ -1,173 +1,143 @@
-# news-etl-mvp/etl/ingest_and_process.py
+"""Lightweight pandas-based ingestion and processing helpers for news RSS feeds.
 
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import current_timestamp, lit, udf, to_timestamp
-from pyspark.sql.types import StructType, StructField, StringType, TimestampType
-import feedparser
-import requests
-from bs4 import BeautifulSoup
+Only metadata is extracted (title, link, published_date, summary, source_url).
+"""
+from typing import List
 import json
 import os
-import datetime
+from pathlib import Path
+from datetime import datetime
 
-# --- Configuration ---
-FEEDS_FILE = "/app/feeds.json"
-OUTPUT_DIR = "/app/data" # Directory within the Docker container
-OUTPUT_FILENAME_PREFIX = "news_articles"
+import requests
+import feedparser
+from bs4 import BeautifulSoup
+import pandas as pd
+from dateutil import parser as date_parser
+import html
 
-# --- Spark Session Initialization (Local Mode) ---
-spark = SparkSession.builder \
-    .appName("NewsETL_MVP") \
-    .master("local[*]") \
-    .config("spark.driver.memory", "4g") \
-    .config("spark.executor.memory", "4g") \
-    .getOrCreate()
 
-print("Spark Session initialized in local mode.")
+DEFAULT_FEEDS_FILE = Path(__file__).resolve().parent / "feeds.json"
 
-# Before parsing
-spark.conf.set("spark.sql.legacy.timeParserPolicy", "LEGACY")
 
-# --- Helper Function to Fetch and Parse a Single RSS Feed ---
-def fetch_and_parse_feed(url):
-    """Fetches and parses a single RSS feed, returning a list of article dictionaries."""
-    articles = []
+def load_feed_urls(feeds_file: str | Path = None) -> List[str]:
+    path = Path(feeds_file) if feeds_file else DEFAULT_FEEDS_FILE
+    if not path.exists():
+        raise FileNotFoundError(f"Feeds file not found: {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("urls", [])
+
+
+def _clean_html(text: str) -> str:
+    if not text:
+        return ""
+    # Remove HTML tags
     try:
-        print(f"Fetching feed: {url}")
-        response = requests.get(url, timeout=15) # Increased timeout
-        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
-        feed = feedparser.parse(response.content)
+        soup = BeautifulSoup(text, "html.parser")
+        cleaned = soup.get_text(separator=" ")
+    except Exception:
+        cleaned = text
+    # Unescape HTML entities and normalize whitespace
+    cleaned = html.unescape(cleaned)
+    cleaned = " ".join(cleaned.split())
+    return cleaned
 
-        for entry in feed.entries:
-            title = getattr(entry, 'title', 'No Title').replace('\n', ' ').strip()
-            link = getattr(entry, 'link', 'No Link').replace('\n', ' ').strip()
-            published = getattr(entry, 'published', None)
-            summary = getattr(entry, 'summary', getattr(entry, 'description', 'No Summary')).replace('\n', ' ').strip()
-            
-            print(published, title, link)
 
-            full_content = None
-            if link and link != "No Link":
-                try:
-                    # Attempt to fetch full article content (basic scraping)
-                    article_response = requests.get(link, timeout=10)
-                    article_response.raise_for_status()
-                    soup = BeautifulSoup(article_response.text, 'html.parser')
-                    # This is a very basic attempt. Real web scraping needs more specific selectors.
-                    # Try to find common article content containers
-                    article_body = soup.find('article') or soup.find('div', class_='article-body') or soup.find('main')
-                    if article_body:
-                        paragraphs = article_body.find_all('p')
-                        full_content = ' '.join([p.get_text().strip() for p in paragraphs if p.get_text().strip() != ''])
-                    else:
-                        full_content = ' '.join([p.get_text().strip() for p in soup.find_all('p') if p.get_text().strip() != ''])
-
-                    if not full_content: # Fallback if no specific content found
-                        full_content = summary # Use summary if full content extraction fails
-
-                except requests.exceptions.RequestException as req_err:
-                    print(f"  Warning: HTTP error fetching full content for {link}: {req_err}")
-                    full_content = summary # Use summary as fallback
-                except Exception as e:
-                    print(f"  Warning: Error parsing full content for {link}: {e}")
-                    full_content = summary # Use summary as fallback
-
-            articles.append({
-                "source_url": url,
-                "title": title,
-                "link": link,
-                "published_date": published,
-                "summary": summary,
-                "full_content": full_content
-            })
-        print(f"Fetched {len(articles)} articles from {url}")
-        return articles
-    except requests.exceptions.RequestException as req_err:
-        print(f"Error fetching feed {url}: {req_err}")
+def fetch_feed_entries(url: str, timeout: int = 15) -> List[dict]:
+    headers = {
+        "User-Agent": "news-etl-bot/1.0 (+https://example.com)"
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=timeout)
+        resp.raise_for_status()
     except Exception as e:
-        print(f"Error parsing feed {url}: {e}")
-    return []
+        print(f"Error fetching {url}: {e}")
+        return []
 
-# --- Main ETL Logic ---
+    feed = feedparser.parse(resp.content)
+    entries = []
+    for e in feed.entries:
+        title = getattr(e, "title", "")
+        link = getattr(e, "link", "")
+        published = getattr(e, "published", None) or getattr(e, "updated", None)
+        summary = getattr(e, "summary", None) or getattr(e, "description", None) or ""
+
+        entries.append({
+            "source_url": url,
+            "title": _clean_html(title),
+            "link": link.strip(),
+            "published_raw": published,
+            "summary": _clean_html(summary),
+        })
+    return entries
+
+
+def fetch_all_articles(feeds_file: str | Path = None) -> pd.DataFrame:
+    urls = load_feed_urls(feeds_file)
+    all_entries: List[dict] = []
+    for u in urls:
+        print(f"Fetching: {u}")
+        all_entries.extend(fetch_feed_entries(u))
+    if not all_entries:
+        return pd.DataFrame(columns=["source_url", "title", "link", "published_raw", "summary"])  # empty
+    df = pd.DataFrame(all_entries)
+    return df
+
+
+def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    # Parse published dates using dateutil; invalid -> NaT
+    def _parse_date(val):
+        try:
+            return date_parser.parse(val) if val else pd.NaT
+        except Exception:
+            return pd.NaT
+
+    df = df.copy()
+    df["published_date"] = df["published_raw"].apply(_parse_date)
+    df["ingestion_timestamp"] = pd.Timestamp.now(tz=None)
+
+    # Basic normalization
+    df["title"] = df["title"].astype(str).str.strip()
+    df["summary"] = df["summary"].astype(str).str.strip()
+
+    # Drop rows without link or title
+    df = df[df["link"].astype(bool)]
+    df = df[df["title"].astype(bool)]
+
+    # Deduplicate by link
+    df = df.drop_duplicates(subset=["link"]).reset_index(drop=True)
+    return df
+
+
+def save_to_csv(df: pd.DataFrame, output_base: str | Path = "data") -> Path:
+    out_base = Path(output_base)
+    out_base.mkdir(parents=True, exist_ok=True)
+    run_ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    out_dir = out_base / f"news_articles_{run_ts}"
+    out_dir.mkdir(parents=True, exist_ok=False)
+
+    out_file = out_dir / "part-00000.csv"
+    # Select the columns we want to persist
+    cols = [
+        "source_url",
+        "title",
+        "link",
+        "published_date",
+        "summary",
+        "ingestion_timestamp",
+    ]
+    df_to_write = df.copy()
+    # Ensure published_date is ISO-formatted strings (empty if NaT)
+    df_to_write["published_date"] = df_to_write["published_date"].apply(lambda x: x.isoformat() if pd.notna(x) else "")
+    df_to_write.to_csv(out_file, columns=cols, index=False, encoding="utf-8")
+
+    # Touch _SUCCESS
+    (out_dir / "_SUCCESS").write_text("")
+    print(f"Wrote {len(df_to_write)} rows to {out_file}")
+    return out_dir
+
+
 if __name__ == "__main__":
-    # 1. Load RSS Feeds from JSON
-    try:
-        with open(FEEDS_FILE, "r") as f:
-            feed_urls = json.load(f)["urls"]
-        print(f"Loaded {len(feed_urls)} RSS feed URLs.")
-    except FileNotFoundError:
-        print(f"Error: {FEEDS_FILE} not found. Please create it.")
-        spark.stop()
-        exit()
-    except Exception as e:
-        print(f"Error loading {FEEDS_FILE}: {e}")
-        spark.stop()
-        exit()
-
-    all_articles_data = []
-    for url in feed_urls:
-        all_articles_data.extend(fetch_and_parse_feed(url))
-
-    if not all_articles_data:
-        print("No articles fetched. Exiting.")
-        spark.stop()
-        exit()
-
-    # Define schema for better data quality and performance
-    schema = StructType([
-        StructField("source_url", StringType(), True),
-        StructField("title", StringType(), True),
-        StructField("link", StringType(), True),
-        StructField("published_date", StringType(), True), # Raw string from feedparser
-        StructField("summary", StringType(), True),
-        StructField("full_content", StringType(), True)
-    ])
-
-    # Create Spark DataFrame from collected data
-    raw_df = spark.createDataFrame(all_articles_data, schema=schema)
-    print(f"Initial DataFrame created with {raw_df.count()} rows.")
-    raw_df.printSchema()
-
-    # 2. Transformation (Basic Cleaning & Duplication Handling)
-    processed_df = raw_df \
-        .withColumn("ingestion_timestamp", current_timestamp()) \
-        .withColumn("published_date", to_timestamp(raw_df["published_date"], "EEE, dd MMM yyyy HH:mm:ss")) # Attempt to parse common RSS date format
-
-    # Handle common HTML entities in text (basic)
-    from pyspark.sql.functions import lit, regexp_replace
-    def clean_text_for_csv(text_col):
-        # Remove common HTML tags (not exhaustive)
-        text_col = regexp_replace(text_col, "<[^>]*>", "")
-        # Replace common HTML entities (add more as needed)
-        text_col = regexp_replace(text_col, "&amp;", "&")
-        text_col = regexp_replace(text_col, "&lt;", "<")
-        text_col = regexp_replace(text_col, "&gt;", ">")
-        text_col = regexp_replace(text_col, "&quot;", "\"")
-        text_col = regexp_replace(text_col, "&#39;", "'")
-        return text_col
-
-    processed_df = processed_df.withColumn("title", clean_text_for_csv(processed_df["title"]))
-    processed_df = processed_df.withColumn("summary", clean_text_for_csv(processed_df["summary"]))
-    processed_df = processed_df.withColumn("full_content", clean_text_for_csv(processed_df["full_content"]))
-
-    # Deduplicate based on link (assuming link is unique for an article)
-    deduplicated_df = processed_df.dropDuplicates(["link"])
-    print(f"DataFrame after deduplication: {deduplicated_df.count()} rows.")
-
-    # 3. Loading to CSV
-    # Ensure the output directory exists on the host (Docker will mount it)
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    output_path = os.path.join(OUTPUT_DIR, f"{OUTPUT_FILENAME_PREFIX}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
-    print(f"Saving processed data to CSV at: {output_path}")
-
-# Write as a single CSV file for simplicity in MVP, good for smaller datasets
-    deduplicated_df.coalesce(1).write \
-        .option("header", True) \
-        .option("escape", "\"") \
-        .option("quoteMode", "ALL") \
-        .csv(output_path, mode="overwrite")
-
-    print("CSV file(s) saved successfully.")
-    spark.stop()
-    print("Spark Session stopped.")
+    print("This module provides helper functions. Use etl_news.py to run the pipeline.")
