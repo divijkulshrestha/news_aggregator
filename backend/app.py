@@ -77,6 +77,8 @@ async def get_articles(
     db: Session = Depends(get_db)
 ):
     """Get articles with optional filtering by category and time range."""
+    from sqlalchemy import or_, and_
+    
     # Calculate time filter
     now = datetime.utcnow()
     time_filters = {
@@ -87,8 +89,13 @@ async def get_articles(
     
     min_date = time_filters.get(time_range, time_filters["1d"])
     
-    # Build query
-    query = db.query(Article).filter(Article.ingestion_timestamp >= min_date)
+    # Build query - filter by published_date if available, otherwise use ingestion_timestamp
+    query = db.query(Article).filter(
+        or_(
+            and_(Article.published_date.isnot(None), Article.published_date >= min_date),
+            and_(Article.published_date.is_(None), Article.ingestion_timestamp >= min_date)
+        )
+    )
     
     if category:
         query = query.filter(Article.category == category)
