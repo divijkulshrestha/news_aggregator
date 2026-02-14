@@ -16,6 +16,9 @@ ENV/
 *.swo
 *~
 
+# CoPilot
+.github/
+
 # Environment variables
 .env
 .env.local
@@ -46,5 +49,18 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
 
 
