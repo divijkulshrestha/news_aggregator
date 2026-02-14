@@ -1,0 +1,42 @@
+{
+  "feeds": [
+    {
+      "category": "top_stories",
+      "urls": [
+        "https://feeds.npr.org/1001/rss.xml",
+        "http://feeds.bbci.co.uk/news/rss.xml"
+      ]
+    },
+    {
+      "category": "world",
+      "urls": [
+        "https://www.aljazeera.com/xml/rss/all.xml",
+        "https://www.theguardian.com/world/rss",
+        "http://feeds.bbci.co.uk/news/world/rss.xml"
+      ]
+    },
+    {
+      "category": "technology",
+      "urls": [
+        "https://techcrunch.com/feed/",
+        "https://www.theverge.com/rss/index.xml",
+        "http://feeds.arstechnica.com/arstechnica/index",
+        "https://www.theguardian.com/technology/rss",
+        "http://feeds.bbci.co.uk/news/technology/rss.xml"
+      ]
+    },
+    {
+      "category": "india",
+      "urls": [
+        "http://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms",
+        "https://www.thehindu.com/news/national/feeder/default.rss"
+      ]
+    },
+    {
+      "category": "cricket",
+      "urls": [
+        "https://www.espncricinfo.com/rss/content/story/feeds/0.xml"
+      ]
+    }
+  ]
+}

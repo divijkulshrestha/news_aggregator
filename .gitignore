@@ -1,7 +1,50 @@
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
 .env
+.env.local
+
+# Database
+pgdata/
+*.db
+*.sqlite
+
+# Logs
+container_logs/
+*.log
+
+# Data
 data/
-output/
-src/.ipynb_checkpoints/
-spark_venv/
+!data/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+

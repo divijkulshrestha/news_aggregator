@@ -1,26 +1,66 @@
 version: '3.8'
 
 services:
-  spark_jupyter:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: pyspark_dev_env
-    ports:
-      - "8888:8888" # Jupyter Notebook
-      - "4040:4040" # Spark UI for local[*] mode
-    volumes:
-      - ./notebooks:/home/divij/work/notebooks # Mount your local notebooks folder
-      - ./data:/home/divij/work/data         # Mount your local data folder
-      - ./src:/home/divij/work/src           # Optional: for Python scripts/modules
-      - ./output:/home/divij/work/output # Optional: for output data
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
     environment:
-      # These are often picked up automatically by the jupyter/pyspark-notebook image
-      # but can be explicitly set if you need specific Spark configurations.
-      # For example, to control memory:
-      # SPARK_DRIVER_MEMORY: "4g"
-      # SPARK_EXECUTOR_MEMORY: "4g"
-      # SPARK_WORKER_CORES: "4" # Or use local[*] in your code
-      JUPYTER_ENABLE_LAB: "yes" # Use Jupyter Lab instead of classic notebook
-    # If you want to use the Spark Master/Worker cluster model (more advanced)
-    # entrypoint: ["/bin/bash", "-c", "start-all.sh && tail -f /dev/null"] # Or your custom entrypoint
+      POSTGRES_DB: news_db
+      POSTGRES_USER: news_user
+      POSTGRES_PASSWORD: news_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U news_user -d news_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - news_network
+
+  # FastAPI Backend
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://news_user:news_password@db:5432/news_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./etl:/app/etl
+    networks:
+      - news_network
+    restart: unless-stopped
+
+  # ETL Job (runs periodically)
+  # Uncomment the command to run ETL on container start
+  # For scheduled runs, use cron or external scheduler
+  etl:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://news_user:news_password@db:5432/news_db
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./etl:/app/etl
+      - ./backend:/app/backend
+      - ./scripts:/app/scripts
+    networks:
+      - news_network
+    # Run ETL once and exit
+    command: python scripts/run_etl.py
+    restart: "no"
+
+volumes:
+  pgdata:
+
+networks:
+  news_network:
+    driver: bridge

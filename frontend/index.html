@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal News Aggregator</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📰 Personal News Feed</h1>
+            <p class="subtitle">Curated news from your favorite sources</p>
+        </header>
+
+        <div class="controls">
+            <div class="filter-group">
+                <label>Category:</label>
+                <button class="filter-btn active" data-category="all">All</button>
+                <button class="filter-btn" data-category="top_stories">Top Stories</button>
+                <button class="filter-btn" data-category="world">World</button>
+                <button class="filter-btn" data-category="technology">Technology</button>
+                <button class="filter-btn" data-category="india">India</button>
+                <button class="filter-btn" data-category="cricket">Cricket</button>
+            </div>
+
+            <div class="filter-group">
+                <label>Time:</label>
+                <button class="filter-btn time-btn" data-time="1h">Last Hour</button>
+                <button class="filter-btn time-btn active" data-time="1d">Last Day</button>
+                <button class="filter-btn time-btn" data-time="7d">Last Week</button>
+            </div>
+
+            <button class="refresh-btn" onclick="refreshArticles()">🔄 Refresh</button>
+        </div>
+
+        <div class="stats">
+            <span id="article-count">Loading...</span>
+            <span id="last-update"></span>
+        </div>
+
+        <div id="articles-container" class="articles-grid">
+            <div class="loading">Loading articles...</div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

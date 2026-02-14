@@ -1,19 +1,26 @@
-# Use a base image with PySpark and Jupyter pre-installed
-FROM jupyter/pyspark-notebook:latest
+FROM python:3.11-slim
 
-# Set the working directory inside the container
-WORKDIR /home/divij/work
+WORKDIR /app
 
-# Copy your local requirements.txt into the container (if you have one)
-# This allows you to install additional Python packages for your project
-# COPY requirements.txt .
-# RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose Jupyter port (already exposed by base image, but good practice)
-EXPOSE 8888
+# Copy application code
+COPY backend/ ./backend/
+COPY etl/ ./etl/
+COPY frontend/ ./frontend/
 
-# Expose Spark UI port
-EXPOSE 4040
+# Create non-root user
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
 
-# Default command when the container starts (Jupyter Notebook)
-CMD ["start-notebook.sh", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/stats')"
+
+# Run the application
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
