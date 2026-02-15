@@ -1,25 +1,43 @@
 // API base URL - will work both locally and when deployed
 const API_BASE = window.location.origin;
 
-let currentCategory = 'all';
+let currentCategory = 'top_stories';
 let currentTimeRange = '1d';
+let currentSearchQuery = '';
+let allArticles = [];
 
 // Initialize the page
 document.addEventListener('DOMContentLoaded', () => {
+    loadThemePreference();
     setupEventListeners();
     loadArticles();
 });
 
+function loadThemePreference() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    setTheme(savedTheme);
+}
+
+function setTheme(theme) {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    
+    // Update active state on theme buttons
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === theme);
+    });
+}
+
 function setupEventListeners() {
     // Category filters
-    document.querySelectorAll('.filter-btn[data-category]').forEach(btn => {
+    document.querySelectorAll('.category-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             // Update active state
-            document.querySelectorAll('.filter-btn[data-category]').forEach(b => 
+            document.querySelectorAll('.category-btn').forEach(b => 
                 b.classList.remove('active'));
-            e.target.classList.add('active');
+            e.target.closest('.category-btn').classList.add('active');
             
-            currentCategory = e.target.dataset.category;
+            currentCategory = e.target.closest('.category-btn').dataset.category;
             loadArticles();
         });
     });
@@ -36,6 +54,25 @@ function setupEventListeners() {
             loadArticles();
         });
     });
+
+    // Theme switcher
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const theme = e.target.closest('.theme-btn').dataset.theme;
+            setTheme(theme);
+        });
+    });
+
+    // Search functionality
+    const searchInput = document.getElementById('search-input');
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            currentSearchQuery = e.target.value.toLowerCase().trim();
+            filterAndDisplayArticles();
+        }, 300); // Debounce for 300ms
+    });
 }
 
 async function loadArticles() {
@@ -49,9 +86,8 @@ async function loadArticles() {
             limit: 100
         });
 
-        if (currentCategory !== 'all') {
-            params.append('category', currentCategory);
-        }
+        // Always filter by current category (no 'all' option anymore)
+        params.append('category', currentCategory);
 
         const response = await fetch(`${API_BASE}/api/articles?${params}`);
         
@@ -59,11 +95,8 @@ async function loadArticles() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const articles = await response.json();
-        displayArticles(articles);
-        
-        // Update stats
-        updateStats(articles.length);
+        allArticles = await response.json();
+        filterAndDisplayArticles();
         
     } catch (error) {
         console.error('Error loading articles:', error);
@@ -74,6 +107,20 @@ async function loadArticles() {
             </div>
         `;
     }
+}
+
+function filterAndDisplayArticles() {
+    let filtered = allArticles;
+
+    // Filter by search query if present
+    if (currentSearchQuery) {
+        filtered = allArticles.filter(article => 
+            article.title.toLowerCase().includes(currentSearchQuery)
+        );
+    }
+
+    displayArticles(filtered);
+    updateStats(filtered.length);
 }
 
 function displayArticles(articles) {

@@ -41,7 +41,7 @@ class TestArticles:
             # Check first article has required elements
             first_article = article_cards.first
             expect(first_article.locator(".article-title")).to_be_visible()
-            expect(first_article.locator(".article-link")).to_be_visible()
+            expect(first_article.locator(".article-title a")).to_be_visible()
     
     def test_should_refresh_articles_when_refresh_button_clicked(self, page: Page):
         """Test that clicking refresh reloads articles."""

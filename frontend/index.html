@@ -7,41 +7,85 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>📰 Personal News Feed</h1>
-            <p class="subtitle">Curated news from your favorite sources</p>
-        </header>
-
-        <div class="controls">
-            <div class="filter-group">
-                <label>Category:</label>
-                <button class="filter-btn active" data-category="all">All</button>
-                <button class="filter-btn" data-category="top_stories">Top Stories</button>
-                <button class="filter-btn" data-category="world">World</button>
-                <button class="filter-btn" data-category="technology">Technology</button>
-                <button class="filter-btn" data-category="india">India</button>
-                <button class="filter-btn" data-category="cricket">Cricket</button>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>📰 News</h1>
             </div>
 
-            <div class="filter-group">
-                <label>Time:</label>
-                <button class="filter-btn time-btn" data-time="1h">Last Hour</button>
-                <button class="filter-btn time-btn active" data-time="1d">Last Day</button>
-                <button class="filter-btn time-btn" data-time="7d">Last Week</button>
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">Categories</h3>
+                <nav class="category-nav">
+                    <button class="category-btn active" data-category="top_stories">
+                        <span class="category-icon">🔥</span>
+                        <span>Top Stories</span>
+                    </button>
+                    <button class="category-btn" data-category="india">
+                        <span class="category-icon">🇮🇳</span>
+                        <span>India</span>
+                    </button>
+                    <button class="category-btn" data-category="world">
+                        <span class="category-icon">🌍</span>
+                        <span>World</span>
+                    </button>
+                    <button class="category-btn" data-category="technology">
+                        <span class="category-icon">💻</span>
+                        <span>Technology</span>
+                    </button>
+                    <button class="category-btn" data-category="cricket">
+                        <span class="category-icon">🏏</span>
+                        <span>Cricket</span>
+                    </button>
+                </nav>
             </div>
 
-            <button class="refresh-btn" onclick="refreshArticles()">🔄 Refresh</button>
-        </div>
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">Appearance</h3>
+                <div class="theme-switcher">
+                    <button class="theme-btn active" data-theme="light">
+                        <span>☀️ Light</span>
+                    </button>
+                    <button class="theme-btn" data-theme="dark">
+                        <span>🌙 Dark</span>
+                    </button>
+                    <button class="theme-btn" data-theme="sepia">
+                        <span>📜 Sepia</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
 
-        <div class="stats">
-            <span id="article-count">Loading...</span>
-            <span id="last-update"></span>
-        </div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="search-container">
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        class="search-input" 
+                        placeholder="🔍 Search headlines..."
+                    >
+                </div>
 
-        <div id="articles-container" class="articles-grid">
-            <div class="loading">Loading articles...</div>
-        </div>
+                <div class="time-filters">
+                    <button class="filter-btn time-btn" data-time="1h">Last Hour</button>
+                    <button class="filter-btn time-btn active" data-time="1d">Last Day</button>
+                    <button class="filter-btn time-btn" data-time="7d">Last Week</button>
+                </div>
+
+                <button class="refresh-btn" onclick="refreshArticles()">🔄 Refresh</button>
+            </header>
+
+            <div class="stats">
+                <span id="article-count">Loading...</span>
+                <span id="last-update"></span>
+            </div>
+
+            <div id="articles-container" class="articles-grid">
+                <div class="loading">Loading articles...</div>
+            </div>
+        </main>
     </div>
 
     <script src="/static/app.js"></script>
