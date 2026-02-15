@@ -379,8 +379,20 @@ body {
     border-left-color: #2563eb;
 }
 
+.article-card[data-category="business_finance"] {
+    border-left-color: #16a34a;
+}
+
+.article-card[data-category="science_history"] {
+    border-left-color: #8b5cf6;
+}
+
 .article-card[data-category="technology"] {
     border-left-color: #7c3aed;
+}
+
+.article-card[data-category="company_blogs"] {
+    border-left-color: #0891b2;
 }
 
 .article-card[data-category="cricket"] {

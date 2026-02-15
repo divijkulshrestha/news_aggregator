@@ -4,7 +4,7 @@
       "category": "top_stories",
       "urls": [
         "https://feeds.npr.org/1001/rss.xml",
-        "http://feeds.bbci.co.uk/news/rss.xml"
+        "http://timesofindia.indiatimes.com/rssfeedstopstories.cms"
       ]
     },
     {
@@ -22,7 +22,8 @@
         "https://www.theverge.com/rss/index.xml",
         "http://feeds.arstechnica.com/arstechnica/index",
         "https://www.theguardian.com/technology/rss",
-        "http://feeds.bbci.co.uk/news/technology/rss.xml"
+        "http://feeds.bbci.co.uk/news/technology/rss.xml",
+        "https://news.ycombinator.com/rss"
       ]
     },
     {
@@ -36,6 +37,34 @@
       "category": "cricket",
       "urls": [
         "https://www.espncricinfo.com/rss/content/story/feeds/0.xml"
+      ]
+    },
+    {
+      "category": "company_blogs",
+      "urls": [
+        "https://openai.com/blog/rss.xml",
+        "https://github.blog/feed/",
+        "https://stackoverflow.blog/feed/"
+      ]
+    },
+    {
+      "category": "business_finance",
+      "urls": [
+        "https://feeds.bloomberg.com/markets/news.rss",
+        "https://www.ft.com/rss/home",
+        "https://www.economist.com/latest/rss.xml"
+      ]
+    },
+    {
+      "category": "science_history",
+      "urls": [
+        "https://www.historytoday.com/feed/rss.xml",
+        "https://www.smithsonianmag.com/rss/history/",
+        "https://www.nationalgeographic.com/history/rss/",
+        "https://www.historyextra.com/feed/",
+        "https://www.scientificamerican.com/rss/",
+        "https://www.nature.com/nature.rss",
+        "https://www.nasa.gov/rss/dyn/breaking_news.rss"
       ]
     }
   ]

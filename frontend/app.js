@@ -144,7 +144,12 @@ function createArticleCard(article) {
         ? new Date(article.published_date).toLocaleString()
         : 'Date unknown';
     
-    const categoryLabel = article.category.replace('_', ' ');
+    // Convert category name: split by underscore, capitalize each word, join with space
+    const categoryLabel = article.category
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    
     const summary = article.summary 
         ? truncateText(article.summary, 200)
         : 'No summary available';
