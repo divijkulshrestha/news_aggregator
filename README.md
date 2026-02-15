@@ -2,14 +2,45 @@
 
 A personalized news aggregation platform that collects articles from curated RSS feeds and presents them in a clean, filterable web interface.
 
+## Screenshots
+
+### Light Mode
+![Light Mode](screenshots/light-mode.png)
+*Clean, modern interface with sidebar navigation*
+
+### Dark Mode
+![Dark Mode](screenshots/dark-mode.png)
+*Easy on the eyes for night-time reading*
+
+### Search & Filter
+![Search Feature](screenshots/search-feature.png)
+*Real-time search and category filtering*
+
+> **Note:** To add screenshots, capture images of the running application and save them in the `screenshots/` directory with the names shown above.
+
 ## Features
 
-- 📰 **Curated News Sources**: Top stories, world news, technology, and cricket
+- 📰 **Diverse News Sources**: Top stories, India, World, Business & Finance, Science & History, Technology, Company Blogs, and Cricket
 - 🔍 **Smart Filtering**: Filter by category and time range (1 hour, 1 day, 7 days)
+- 🔎 **Real-time Search**: Search headlines instantly as you type
+- 🎨 **Theme Options**: Light, Dark, and Sepia modes for comfortable reading
+- 🎯 **Sidebar Navigation**: Clean, icon-based category browsing
 - 🚀 **Modern Stack**: FastAPI backend + PostgreSQL + Responsive frontend
 - ☁️ **AWS Ready**: Designed for deployment on AWS with Docker support
 - 🔄 **Auto-refresh**: Scheduled ETL jobs keep content fresh
 - 🧹 **Auto-cleanup**: Removes articles older than 7 days
+- 📱 **Responsive Design**: Works seamlessly on desktop and mobile
+
+## User Interface
+
+The application features a modern, intuitive interface with:
+
+- **Sidebar Navigation**: Quick access to all news categories with custom icons
+- **Theme Switcher**: Toggle between Light ☀️, Dark 🌙, and Sepia 📜 modes (preference saved locally)
+- **Search Bar**: Real-time headline filtering with instant results
+- **Time Filters**: View articles from the last hour, day, or week
+- **Color-Coded Cards**: Each category has a unique accent color for easy identification
+- **Responsive Layout**: Sidebar transforms into a mobile-friendly top navigation on smaller screens
 
 ## Data Flow
 
@@ -204,9 +235,13 @@ DELETE /api/cleanup
 
 ## RSS Feed Sources
 
-- **Top Stories**: Reuters, NPR, BBC
-- **World News**: The Guardian, BBC, Reuters
-- **Technology**: The Guardian, BBC, Reuters
+- **Top Stories**: NPR, Times of India
+- **India**: Times of India, The Hindu
+- **World News**: Al Jazeera, The Guardian, BBC
+- **Business & Finance**: Bloomberg, Financial Times, The Economist
+- **Science & History**: History Today, Smithsonian, History Extra, Nature, NASA
+- **Technology**: TechCrunch, The Verge, Ars Technica, The Guardian, BBC, Hacker News
+- **Company Blogs**: OpenAI, GitHub, Stack Overflow
 - **Cricket**: ESPN Cricinfo
 
 To add or modify feeds, edit `etl/feeds.json`.
