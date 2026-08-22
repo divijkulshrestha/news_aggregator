@@ -1,15 +1,27 @@
 """Database connection and models for news aggregation platform."""
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
+import logging
 import os
 
-# Database URL from environment variable
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://news_user:news_password@localhost:5432/news_db"
-)
+logger = logging.getLogger(__name__)
+
+# Database URL from environment variable. Only local dev may fall back to the default
+# credentials below; any other ENVIRONMENT must set DATABASE_URL explicitly or fail fast,
+# rather than silently connecting with well-known default credentials.
+ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    if ENVIRONMENT == "local":
+        DATABASE_URL = "postgresql://news_user:news_password@localhost:5432/news_db"
+    else:
+        raise RuntimeError(
+            f"DATABASE_URL must be set when ENVIRONMENT={ENVIRONMENT!r}; "
+            "refusing to fall back to default local credentials."
+        )
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -33,6 +45,79 @@ class Article(Base):
         return f"<Article(id={self.id}, category={self.category}, title={self.title[:50]})>"
 
 
+class Bookmark(Base):
+    """Bookmark model for saving favorite articles."""
+    __tablename__ = "bookmarks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    article = relationship("Article")
+
+    def __repr__(self):
+        return f"<Bookmark(article_id={self.article_id})>"
+
+
+class ReadHistory(Base):
+    """Tracks articles the user has clicked through to read."""
+    __tablename__ = "read_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    visited_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    article = relationship("Article")
+
+    def __repr__(self):
+        return f"<ReadHistory(article_id={self.article_id}, visited_at={self.visited_at})>"
+
+
+class Feed(Base):
+    """RSS feed source, replacing the static feeds.json file."""
+    __tablename__ = "feeds"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String(50), nullable=False, index=True)
+    url = Column(String(1000), unique=True, nullable=False)
+    enabled = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<Feed(category={self.category}, url={self.url})>"
+
+
+class FeedRun(Base):
+    """Records the outcome of a single feed fetch attempt during an ETL run."""
+    __tablename__ = "feed_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    feed_id = Column(Integer, ForeignKey("feeds.id", ondelete="CASCADE"), nullable=False, index=True)
+    run_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    success = Column(Boolean, nullable=False)
+    articles_fetched = Column(Integer, nullable=False, default=0)
+    error_message = Column(Text)
+
+    feed = relationship("Feed")
+
+    def __repr__(self):
+        return f"<FeedRun(feed_id={self.feed_id}, success={self.success}, run_at={self.run_at})>"
+
+
+class DailyStats(Base):
+    """Daily rollup of ingested article counts per category."""
+    __tablename__ = "daily_stats"
+    __table_args__ = (UniqueConstraint("date", "category", name="uq_daily_stats_date_category"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(DateTime, nullable=False, index=True)
+    category = Column(String(50), nullable=False, index=True)
+    articles_ingested = Column(Integer, nullable=False, default=0)
+
+    def __repr__(self):
+        return f"<DailyStats(date={self.date}, category={self.category}, articles_ingested={self.articles_ingested})>"
+
+
 def get_db():
     """Dependency for getting database sessions."""
     db = SessionLocal()
@@ -45,7 +130,7 @@ def get_db():
 def init_db():
     """Initialize database tables."""
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully")
+    logger.info("Database tables created successfully")
 
 
 if __name__ == "__main__":
