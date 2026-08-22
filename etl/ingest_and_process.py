@@ -8,16 +8,20 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import urljoin
 
 import requests
 import feedparser
 from bs4 import BeautifulSoup
 import pandas as pd
 from dateutil import parser as date_parser
+from sqlalchemy.dialects.postgresql import insert
 import html
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from url_safety import validate_feed_url, UnsafeFeedUrlError
 
 DEFAULT_FEEDS_FILE = Path(__file__).resolve().parent / "feeds.json"
 
@@ -106,12 +110,25 @@ def fetch_feed_entries(url: str, category: str = "general", timeout: int = 15) -
         category: Category tag for the articles
         timeout: Request timeout in seconds
     """
+    try:
+        validate_feed_url(url)
+    except UnsafeFeedUrlError as e:
+        print(f"Refusing to fetch {url}: {e}")
+        return []
+
     headers = {
         "User-Agent": "news-etl-bot/1.0 (+https://example.com)"
     }
     try:
-        resp = requests.get(url, headers=headers, timeout=timeout)
+        resp = requests.get(url, headers=headers, timeout=timeout, allow_redirects=False)
+        if resp.is_redirect:
+            redirect_url = urljoin(url, resp.headers.get("Location", ""))
+            validate_feed_url(redirect_url)
+            resp = requests.get(redirect_url, headers=headers, timeout=timeout, allow_redirects=False)
         resp.raise_for_status()
+    except UnsafeFeedUrlError as e:
+        print(f"Refusing to follow redirect for {url}: {e}")
+        return []
     except Exception as e:
         print(f"Error fetching {url}: {e}")
         return []
@@ -227,8 +244,7 @@ def save_to_postgres(df: pd.DataFrame, db_url: str = None) -> int:
         Number of new articles inserted
     """
     try:
-        from backend.database import Article, SessionLocal, engine
-        from sqlalchemy.dialects.postgresql import insert
+        from backend.database import Article, SessionLocal
     except ImportError:
         print("Error: Cannot import database modules. Make sure backend/database.py exists.")
         return 0
@@ -251,23 +267,19 @@ def save_to_postgres(df: pd.DataFrame, db_url: str = None) -> int:
         }
         articles_data.append(article_dict)
     
-    # Use upsert to avoid duplicates (based on unique link)
+    # Bulk upsert: skip rows whose link already exists (unique constraint on Article.link)
     db = SessionLocal()
-    inserted_count = 0
-    
+
     try:
-        for article_data in articles_data:
-            # Check if article already exists
-            existing = db.query(Article).filter(Article.link == article_data["link"]).first()
-            if not existing:
-                article = Article(**article_data)
-                db.add(article)
-                inserted_count += 1
-        
+        stmt = insert(Article).values(articles_data)
+        stmt = stmt.on_conflict_do_nothing(index_elements=["link"]).returning(Article.id)
+        inserted_ids = db.execute(stmt).scalars().all()
         db.commit()
+
+        inserted_count = len(inserted_ids)
         print(f"✅ Inserted {inserted_count} new articles (skipped {len(articles_data) - inserted_count} duplicates)")
         return inserted_count
-        
+
     except Exception as e:
         db.rollback()
         print(f"Error saving to database: {e}")

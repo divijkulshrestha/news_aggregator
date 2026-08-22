@@ -324,20 +324,26 @@ function escapeHtml(text) {
 }
 
 function createArticleCard(article) {
-    const publishedDate = article.published_date 
+    const publishedDate = article.published_date
         ? new Date(article.published_date).toLocaleString()
         : 'Date unknown';
-    
+
     // Convert category name: split by underscore, capitalize each word, join with space
     const categoryLabel = article.category
         .split('_')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
-    
-    const summary = article.summary 
+
+    const safeCategory = escapeHtml(article.category);
+    const safeCategoryLabel = escapeHtml(categoryLabel);
+    const safeTitle = escapeHtml(article.title);
+    const safeLink = /^https?:\/\//i.test(article.link || '') ? escapeHtml(article.link) : '#';
+
+    const summary = article.summary
         ? truncateText(article.summary, 200)
         : 'No summary available';
-    
+    const safeSummary = escapeHtml(summary);
+
     const sourceHost = extractHostname(article.source_url);
     const starred = article.is_bookmarked;
 
@@ -346,9 +352,9 @@ function createArticleCard(article) {
         : '';
 
     return `
-        <div class="article-card" data-category="${article.category}">
+        <div class="article-card" data-category="${safeCategory}">
             <div class="article-card-header">
-                <span class="article-category">${categoryLabel}</span>
+                <span class="article-category">${safeCategoryLabel}</span>
                 <button class="bookmark-btn ${starred ? 'bookmarked' : ''}"
                         onclick="toggleBookmark(${article.id}, this)"
                         title="${starred ? 'Remove bookmark' : 'Bookmark this article'}">
@@ -356,11 +362,11 @@ function createArticleCard(article) {
                 </button>
             </div>
             <h2 class="article-title">
-                <a href="${article.link}" target="_blank" rel="noopener noreferrer" onclick="logHistory(${article.id})">
-                    ${article.title}
+                <a href="${safeLink}" target="_blank" rel="noopener noreferrer" onclick="logHistory(${article.id})">
+                    ${safeTitle}
                 </a>
             </h2>
-            <p class="article-summary">${summary}</p>
+            <p class="article-summary">${safeSummary}</p>
             <div class="article-meta">
                 <span class="article-source">📡 ${sourceHost}</span>
                 <span class="article-date">🕒 ${publishedDate}</span>

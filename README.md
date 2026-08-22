@@ -228,10 +228,8 @@ GET /api/categories
 GET /api/stats
 ```
 
-### Cleanup Old Articles
-```
-DELETE /api/cleanup
-```
+Old articles (7+ days, excluding bookmarks) are cleaned up automatically after every
+scheduled ETL run — see `scripts/run_etl.py`.
 
 ## RSS Feed Sources
 

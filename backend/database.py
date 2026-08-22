@@ -5,11 +5,20 @@ from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 import os
 
-# Database URL from environment variable
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://news_user:news_password@localhost:5432/news_db"
-)
+# Database URL from environment variable. Only local dev may fall back to the default
+# credentials below; any other ENVIRONMENT must set DATABASE_URL explicitly or fail fast,
+# rather than silently connecting with well-known default credentials.
+ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    if ENVIRONMENT == "local":
+        DATABASE_URL = "postgresql://news_user:news_password@localhost:5432/news_db"
+    else:
+        raise RuntimeError(
+            f"DATABASE_URL must be set when ENVIRONMENT={ENVIRONMENT!r}; "
+            "refusing to fall back to default local credentials."
+        )
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

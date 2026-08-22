@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 COPY etl/ ./etl/
 COPY frontend/ ./frontend/
+COPY url_safety.py .
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
