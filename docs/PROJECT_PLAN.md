@@ -140,11 +140,11 @@ Revisit this section if the app grows to multi-user or high-traffic use (matches
 - [x] Improve mobile responsiveness (`frontend/index.html`/`styles.css`/`app.js` — sidebar converted to an off-canvas drawer with hamburger toggle on mobile instead of dumping in-flow above the feed; `frontend/feeds.css`/`feeds.js` — feed form stacks, table scrolls horizontally instead of overflowing the page)
 
 #### 2.5 Code Quality
-- [ ] Code review and refactoring
-- [ ] Add type hints throughout
-- [ ] Improve error handling
-- [ ] Add logging framework
-- [ ] Security audit (SQL injection, XSS)
+- [x] Code review and refactoring (`docs/security_review.md` — 9 findings: 5 fixed, addressed below)
+- [x] Add type hints throughout (`backend/app.py`, `etl/ingest_and_process.py`)
+- [x] Improve error handling
+- [x] Add logging framework (`backend/logging_config.py` — stdlib `logging` to stdout/stderr via `basicConfig`, `LOG_LEVEL` env var; replaces `print()` in `backend/`, `etl/`, `scripts/`; exception sites use `logger.exception()` to capture tracebacks. Deliberately not logging to the DB — stdout is picked up by the container log driver (Docker locally, CloudWatch on ECS) with no extra write path or failure mode to manage.)
+- [x] Security audit (SQL injection, XSS) — stored XSS (`escapeHtml` in `frontend/app.js`), SSRF on feed URLs (`url_safety.py`), hardcoded DB credential fallback, and a duplicated unauthenticated cleanup endpoint were found and fixed. Two findings remain open, deliberately deferred: no auth on the feeds admin page/API (acceptable for a single-user personal tool, not exposed publicly) and a CORS config with `allow_origins=["*"]` + `allow_credentials=True` (unsafe combo, browsers already reject it, but worth tightening if this is ever exposed beyond localhost).
 
 ---
 

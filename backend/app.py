@@ -16,7 +16,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.database import get_db, Article, Bookmark, Feed, ReadHistory, init_db
+from backend.logging_config import setup_logging
 from url_safety import validate_feed_url, UnsafeFeedUrlError
+
+setup_logging()
 
 app = FastAPI(
     title="Personal News Aggregator",

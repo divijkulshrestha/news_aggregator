@@ -4,6 +4,7 @@ Only metadata is extracted (title, link, published_date, summary, source_url, ca
 """
 from typing import List, Dict
 import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -22,6 +23,8 @@ import html
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from url_safety import validate_feed_url, UnsafeFeedUrlError
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_FEEDS_FILE = Path(__file__).resolve().parent / "feeds.json"
 
@@ -113,7 +116,7 @@ def fetch_feed_entries(url: str, category: str = "general", timeout: int = 15) -
     try:
         validate_feed_url(url)
     except UnsafeFeedUrlError as e:
-        print(f"Refusing to fetch {url}: {e}")
+        logger.warning("Refusing to fetch %s: %s", url, e)
         return []
 
     headers = {
@@ -127,10 +130,10 @@ def fetch_feed_entries(url: str, category: str = "general", timeout: int = 15) -
             resp = requests.get(redirect_url, headers=headers, timeout=timeout, allow_redirects=False)
         resp.raise_for_status()
     except UnsafeFeedUrlError as e:
-        print(f"Refusing to follow redirect for {url}: {e}")
+        logger.warning("Refusing to follow redirect for %s: %s", url, e)
         return []
-    except Exception as e:
-        print(f"Error fetching {url}: {e}")
+    except Exception:
+        logger.exception("Error fetching %s", url)
         return []
 
     feed = feedparser.parse(resp.content)
@@ -166,7 +169,7 @@ def fetch_all_articles(feeds_file: str | Path = None) -> pd.DataFrame:
         urls = feed.get("urls", [])
         
         for url in urls:
-            print(f"Fetching [{category}]: {url}")
+            logger.info("Fetching [%s]: %s", category, url)
             all_entries.extend(fetch_feed_entries(url, category))
     
     if not all_entries:
@@ -229,7 +232,7 @@ def save_to_csv(df: pd.DataFrame, output_base: str | Path = "data") -> Path:
 
     # Touch _SUCCESS
     (out_dir / "_SUCCESS").write_text("")
-    print(f"Wrote {len(df_to_write)} rows to {out_file}")
+    logger.info("Wrote %d rows to %s", len(df_to_write), out_file)
     return out_dir
 
 
@@ -246,11 +249,11 @@ def save_to_postgres(df: pd.DataFrame, db_url: str = None) -> int:
     try:
         from backend.database import Article, SessionLocal
     except ImportError:
-        print("Error: Cannot import database modules. Make sure backend/database.py exists.")
+        logger.error("Cannot import database modules. Make sure backend/database.py exists.")
         return 0
-    
+
     if df.empty:
-        print("No articles to save")
+        logger.info("No articles to save")
         return 0
     
     # Prepare data for insertion
@@ -277,12 +280,15 @@ def save_to_postgres(df: pd.DataFrame, db_url: str = None) -> int:
         db.commit()
 
         inserted_count = len(inserted_ids)
-        print(f"✅ Inserted {inserted_count} new articles (skipped {len(articles_data) - inserted_count} duplicates)")
+        logger.info(
+            "Inserted %d new articles (skipped %d duplicates)",
+            inserted_count, len(articles_data) - inserted_count
+        )
         return inserted_count
 
-    except Exception as e:
+    except Exception:
         db.rollback()
-        print(f"Error saving to database: {e}")
+        logger.exception("Error saving to database")
         return 0
     finally:
         db.close()

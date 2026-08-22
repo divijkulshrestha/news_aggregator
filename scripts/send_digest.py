@@ -7,6 +7,7 @@ useful for previewing content before wiring up real credentials.
 
 Can be triggered by cron, AWS EventBridge, or run manually.
 """
+import logging
 import os
 import sys
 import smtplib
@@ -22,6 +23,10 @@ load_dotenv()
 
 from backend.database import SessionLocal
 from backend.digest import get_digest_articles, render_digest_html, render_digest_text
+from backend.logging_config import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 
 def build_message(html_body: str, text_body: str, from_email: str, to_email: str) -> MIMEMultipart:
@@ -66,22 +71,21 @@ def main():
     text_body = render_digest_text(grouped)
 
     if not smtp_host:
-        print("SMTP_HOST not configured - dry run. Digest content:\n")
-        print(text_body)
+        logger.info("SMTP_HOST not configured - dry run. Digest content:\n%s", text_body)
         return 0
 
     if not from_email or not to_email:
-        print("DIGEST_FROM_EMAIL and DIGEST_TO_EMAIL must be set to send email.")
+        logger.error("DIGEST_FROM_EMAIL and DIGEST_TO_EMAIL must be set to send email.")
         return 1
 
     msg = build_message(html_body, text_body, from_email, to_email)
 
     try:
         send_email(msg, smtp_host, smtp_port, smtp_username, smtp_password, smtp_use_tls)
-        print(f"✅ Digest sent to {to_email}")
+        logger.info("Digest sent to %s", to_email)
         return 0
-    except Exception as e:
-        print(f"❌ Failed to send digest: {e}")
+    except Exception:
+        logger.exception("Failed to send digest")
         return 1
 
 

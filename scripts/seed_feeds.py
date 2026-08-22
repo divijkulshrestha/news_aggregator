@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """One-time migration: load etl/feeds.json into the feeds database table."""
+import logging
 import sys
 from pathlib import Path
 
@@ -7,6 +8,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from etl.ingest_and_process import load_categorized_feeds
 from backend.database import Feed, SessionLocal, init_db
+from backend.logging_config import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 
 def seed_feeds():
@@ -24,7 +29,7 @@ def seed_feeds():
                     db.add(Feed(category=category, url=url, enabled=True))
                     inserted += 1
         db.commit()
-        print(f"Seeded {inserted} feeds into the database.")
+        logger.info("Seeded %d feeds into the database.", inserted)
     finally:
         db.close()
 

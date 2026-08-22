@@ -3,7 +3,10 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, B
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 # Database URL from environment variable. Only local dev may fall back to the default
 # credentials below; any other ENVIRONMENT must set DATABASE_URL explicitly or fail fast,
@@ -96,7 +99,7 @@ def get_db():
 def init_db():
     """Initialize database tables."""
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully")
+    logger.info("Database tables created successfully")
 
 
 if __name__ == "__main__":
