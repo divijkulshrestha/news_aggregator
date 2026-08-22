@@ -1,6 +1,6 @@
-# Personal News Aggregator
+# Divij's Digest
 
-A personalized news aggregation platform that collects articles from curated RSS feeds and presents them in a clean, filterable web interface.
+A personal news aggregation platform that collects articles from curated RSS feeds and presents them in a clean, filterable web interface — with bookmarks, reading history, a weekly email digest, and an admin panel for managing feeds and monitoring pipeline health.
 
 ## Screenshots
 
@@ -16,31 +16,26 @@ A personalized news aggregation platform that collects articles from curated RSS
 ![Search Feature](screenshots/search-feature.png)
 *Real-time search and category filtering*
 
-> **Note:** To add screenshots, capture images of the running application and save them in the `screenshots/` directory with the names shown above.
-
 ## Features
 
-- 📰 **Diverse News Sources**: Top stories, India, World, Business & Finance, Science & History, Technology, Company Blogs, and Cricket
-- 🔍 **Smart Filtering**: Filter by category and time range (1 hour, 1 day, 7 days)
-- 🔎 **Real-time Search**: Search headlines instantly as you type
-- 🎨 **Theme Options**: Light, Dark, and Sepia modes for comfortable reading
-- 🎯 **Sidebar Navigation**: Clean, icon-based category browsing
-- 🚀 **Modern Stack**: FastAPI backend + PostgreSQL + Responsive frontend
-- ☁️ **AWS Ready**: Designed for deployment on AWS with Docker support
-- 🔄 **Auto-refresh**: Scheduled ETL jobs keep content fresh
-- 🧹 **Auto-cleanup**: Removes articles older than 7 days
-- 📱 **Responsive Design**: Works seamlessly on desktop and mobile
+- **Diverse News Sources**: Top stories, India, World, Business & Finance, Science & History, Technology, Company Blogs, and Cricket
+- **Smart Filtering**: Filter by category and time range (1 hour, 1 day, 7 days), with live per-category article counts
+- **Real-time Search**: Search headlines instantly as you type
+- **Bookmarks & Reading History**: Save articles for later and track what you've actually read
+- **Weekly Email Digest**: Optional SMTP-configured summary of the week's top articles, grouped by category
+- **Admin Panel**: Manage RSS feeds (add/edit/enable/delete), view ingestion stats, and monitor per-feed health (success rate, consecutive failures) with a trend chart
+- **Theme Options**: Light, Dark, and Sepia modes, saved locally
+- **Responsive Design**: Off-canvas sidebar drawer on mobile, works seamlessly on desktop and mobile
+- **Keyboard Shortcuts**: Quick navigation without touching the mouse (press `?` in-app for the full list)
+- **Auto-refresh & Cleanup**: Scheduled ETL job ingests new articles and purges anything older than 7 days (bookmarks are exempt)
 
 ## User Interface
 
-The application features a modern, intuitive interface with:
-
-- **Sidebar Navigation**: Quick access to all news categories with custom icons
-- **Theme Switcher**: Toggle between Light ☀️, Dark 🌙, and Sepia 📜 modes (preference saved locally)
+- **Sidebar Navigation**: Category browsing with live counts, bookmarks, and reading history
+- **Theme Switcher**: Compact segmented control for Light / Dark / Sepia
 - **Search Bar**: Real-time headline filtering with instant results
 - **Time Filters**: View articles from the last hour, day, or week
 - **Color-Coded Cards**: Each category has a unique accent color for easy identification
-- **Responsive Layout**: Sidebar transforms into a mobile-friendly top navigation on smaller screens
 
 ## Data Flow
 
@@ -52,43 +47,32 @@ sequenceDiagram
     participant API as FastAPI
     participant UI as Frontend
     participant User as User
-    
-    Note over ETL: Runs every hour
-    ETL->>RSS: Fetch articles
+
+    Note over ETL: Runs on a schedule (e.g. hourly)
+    ETL->>RSS: Fetch articles (SSRF-validated URLs)
     RSS-->>ETL: XML/RSS data
-    ETL->>ETL: Parse & clean
-    ETL->>DB: Insert new articles
-    
+    ETL->>ETL: Parse, clean, dedupe
+    ETL->>DB: Bulk upsert new articles
+    ETL->>DB: Record feed run (success/failure) + daily stats rollup
+
     User->>UI: Open website
-    UI->>API: GET /api/articles?category=tech&time=1d
+    UI->>API: GET /api/articles?category=tech&time_range=1d
     API->>DB: Query articles
     DB-->>API: Article data
     API-->>UI: JSON response
     UI->>User: Display articles
-    
-    Note over DB: Auto-cleanup old articles
+
+    Note over DB: Auto-cleanup articles older than 7 days (bookmarks excluded)
 ```
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    A[RSS Feeds<br/>Reuters, BBC, Guardian, NPR] --> B[ETL Process<br/>Pandas + Python]
-    B --> C[(PostgreSQL<br/>Database)]
-    C --> D[FastAPI Backend<br/>REST API]
-    D --> E[Frontend<br/>HTML/CSS/JavaScript]
-    E --> F[User Browser]
-    
-    G[EventBridge/Cron] -.Triggers Every Hour.-> B
-    
-    style A fill:#e1f5ff
-    style B fill:#fff4e1
-    style C fill:#e8f5e9
-    style D fill:#f3e5f5
-    style E fill:#fce4ec
-    style F fill:#fff9c4
-    style G fill:#ffebee
-```
+- **RSS Feeds** (Reuters, BBC, Guardian, NPR, and more) — configured via the admin panel, stored in Postgres
+- **ETL Process** (Pandas + Python) — fetches, cleans, dedupes, and bulk-upserts articles; records feed health and daily stats
+- **PostgreSQL** — articles, bookmarks, reading history, feeds, feed run history, daily rollups
+- **FastAPI Backend** — REST API for articles, bookmarks, history, feeds, and admin stats
+- **Frontend** (HTML/CSS/JavaScript) — no framework, no build step
+- **EventBridge/Cron** — triggers the ETL job on a schedule in production
 
 ## Local Development
 
@@ -145,9 +129,10 @@ flowchart TD
 
 9. **Access the application**
    - Frontend: http://localhost:8000
-   - API Docs: http://localhost:8000/docs
+   - Admin panel: http://localhost:8000/admin.html
+   - API docs: http://localhost:8000/docs
 
-📚 **See [docs/QUICKSTART.md](docs/QUICKSTART.md) for detailed setup instructions.**
+See [docs/QUICKSTART.md](docs/QUICKSTART.md) for detailed setup instructions.
 
 ## Docker Deployment
 
@@ -164,7 +149,7 @@ This starts:
 
 ## AWS Deployment
 
-See [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md) for complete deployment guide covering:
+See [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md) for the complete deployment guide covering:
 - RDS PostgreSQL setup
 - ECS Fargate deployment
 - EventBridge scheduled ETL
@@ -172,64 +157,55 @@ See [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md) for complete deployment gui
 
 ## Project Structure
 
-```mermaid
-graph LR
-    A[news_etl/] --> B[backend/]
-    A --> C[etl/]
-    A --> D[frontend/]
-    A --> E[scripts/]
-    A --> F[docs/]
-    A --> G[Config Files]
-    
-    B --> B1[app.py<br/>FastAPI Server]
-    B --> B2[database.py<br/>SQLAlchemy Models]
-    
-    C --> C1[feeds.json<br/>RSS Sources]
-    C --> C2[etl_news.py<br/>ETL Runner]
-    C --> C3[ingest_and_process.py<br/>Core Logic]
-    
-    D --> D1[index.html]
-    D --> D2[styles.css]
-    D --> D3[app.js]
-    
-    E --> E1[run_etl.py<br/>Scheduler]
-    
-    F --> F1[QUICKSTART.md]
-    F --> F2[AWS_DEPLOYMENT.md]
-    F --> F3[PROJECT_PLAN.md]
-    
-    G --> G1[Dockerfile]
-    G --> G2[docker-compose.yml]
-    G --> G3[requirements.txt]
-    
-    style A fill:#e3f2fd
-    style B fill:#f3e5f5
-    style C fill:#fff3e0
-    style D fill:#e8f5e9
-    style E fill:#fce4ec
-    style F fill:#fff9c4
-    style G fill:#f1f8e9
+```
+news_etl/
+├── backend/        # FastAPI app, SQLAlchemy models, digest/stats logic, logging config
+├── etl/            # RSS ingestion, cleaning, dedup, feed loading
+├── frontend/       # index.html (main app), admin.html (feed/health admin panel), app.js, styles.css
+├── scripts/        # Scheduled ETL runner, digest sender, feed seeding
+├── docs/           # Quickstart, AWS deployment guide, project plan, security review
+└── tests/          # Playwright end-to-end tests
 ```
 
 ## API Endpoints
 
-### Get Articles
+**Articles & search**
 ```
 GET /api/articles?category={category}&time_range={1h|1d|7d}&limit={100}
-```
-
-### Get Categories
-```
-GET /api/categories
-```
-
-### Get Statistics
-```
+GET /api/categories?time_range={1h|1d|7d}
 GET /api/stats
 ```
 
-Old articles (7+ days, excluding bookmarks) are cleaned up automatically after every
-scheduled ETL run — see `scripts/run_etl.py`.
+**Bookmarks**
+```
+GET    /api/bookmarks
+POST   /api/bookmarks/{article_id}
+DELETE /api/bookmarks/{article_id}
+```
+
+**Reading history**
+```
+GET    /api/history
+POST   /api/history/{article_id}
+DELETE /api/history
+```
+
+**RSS feed management**
+```
+GET    /api/feeds
+POST   /api/feeds
+PATCH  /api/feeds/{feed_id}
+DELETE /api/feeds/{feed_id}
+```
+
+**Admin: health & stats**
+```
+GET /api/admin/stats/overview
+GET /api/admin/stats/trends?days={N}
+GET /api/admin/feeds/health
+```
+
+Old articles (7+ days, excluding bookmarks) are cleaned up automatically after every scheduled ETL run — see `scripts/run_etl.py`.
 
 ## RSS Feed Sources
 
@@ -242,15 +218,20 @@ scheduled ETL run — see `scripts/run_etl.py`.
 - **Company Blogs**: OpenAI, GitHub, Stack Overflow
 - **Cricket**: ESPN Cricinfo
 
-To add or modify feeds, edit `etl/feeds.json`.
+Feeds are managed through the admin panel (`/admin.html`) and stored in the database; `etl/feeds.json` is used as a one-time seed and as a fallback if the feeds table is empty.
 
 ## Configuration
 
 ### Environment Variables
 
+- `ENVIRONMENT`: `local` (default, allows a hardcoded local DB fallback) or anything else (requires `DATABASE_URL` to be set explicitly)
 - `DATABASE_URL`: PostgreSQL connection string
-- `API_HOST`: API server host (default: 0.0.0.0)
-- `API_PORT`: API server port (default: 8000)
+- `API_HOST` / `API_PORT`: API server host/port (defaults: `0.0.0.0` / `8000`)
+- `LOG_LEVEL`: Logging verbosity (default: `INFO`)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_USE_TLS`: Weekly digest email delivery (omit `SMTP_HOST` to run the digest in dry-run/print mode)
+- `DIGEST_FROM_EMAIL`, `DIGEST_TO_EMAIL`, `DIGEST_CATEGORIES`, `DIGEST_ARTICLES_PER_CATEGORY`: Digest content configuration
+
+See `.env.example` for the full list with defaults.
 
 ### ETL Schedule
 
@@ -264,31 +245,46 @@ Example cron schedule (every hour):
 0 * * * * cd /path/to/news_etl && python scripts/run_etl.py
 ```
 
+### Weekly Digest
+
+```bash
+python scripts/send_digest.py
+```
+
+Runs in dry-run mode (prints the digest instead of sending) until `SMTP_HOST` is configured.
+
 ## Testing
 
-Run tests:
+Run the Playwright end-to-end test suite:
+```bash
+pytest tests/e2e/
+```
+
+Run the ETL unit tests:
 ```bash
 pytest etl/tests/
 ```
 
 ## Documentation
 
-- 📖 [Quick Start Guide](docs/QUICKSTART.md) - Get started in 5 minutes
-- 📋 [Project Implementation Plan](docs/PROJECT_PLAN.md) - Complete roadmap from local dev to AWS
-- ☁️ [AWS Deployment Guide](docs/AWS_DEPLOYMENT.md) - Deploy to AWS cloud
-- 🔌 [API Documentation](http://localhost:8000/docs) - Interactive API docs (when server is running)
+- [Quick Start Guide](docs/QUICKSTART.md) — Get started in 5 minutes
+- [Project Implementation Plan](docs/PROJECT_PLAN.md) — Complete roadmap from local dev to AWS
+- [AWS Deployment Guide](docs/AWS_DEPLOYMENT.md) — Deploy to AWS cloud
+- [Security Review](docs/security_review.md) — Findings and fixes from a code quality/security audit
+- [API Documentation](http://localhost:8000/docs) — Interactive API docs (when server is running)
 
 ## Portfolio Value
 
 This project demonstrates:
-- ✅ ETL pipeline design and implementation
-- ✅ REST API development with FastAPI
-- ✅ Database modeling with PostgreSQL
-- ✅ Frontend development
-- ✅ Containerization with Docker
-- ✅ AWS cloud deployment (RDS, ECS, EventBridge)
-- ✅ Scheduled job automation
-- ✅ Full-stack development
+- ETL pipeline design: fetch, clean, dedupe, bulk upsert, scheduled batch runs
+- Data quality monitoring: per-feed run history, success rates, daily ingestion rollups
+- REST API development with FastAPI, including admin/observability endpoints
+- Database modeling with PostgreSQL and SQLAlchemy
+- Frontend development without a framework (vanilla HTML/CSS/JS, hand-rolled SVG charts)
+- Containerization with Docker
+- AWS cloud deployment (RDS, ECS, EventBridge)
+- Security-conscious ingestion (SSRF-safe URL validation, XSS-safe rendering, fail-fast credential handling)
+- Full-stack development end to end
 
 ## License
 
