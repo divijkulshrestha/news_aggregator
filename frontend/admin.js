@@ -11,6 +11,7 @@ const CATEGORY_COLORS = {
     cricket: '#059669',
 };
 const FALLBACK_COLORS = ['#e11d48', '#0284c7', '#65a30d', '#d97706', '#9333ea', '#0d9488'];
+const PAPER_GRAYS = ['#1a1a1a', '#4a4a4a', '#7a7a7a', '#2e2e2e', '#5e5e5e', '#8e8e8e', '#3a3a3a', '#6a6a6a'];
 
 let feedsCache = [];
 let healthCache = [];
@@ -58,6 +59,9 @@ function renderOverview(stats) {
 }
 
 function categoryColor(category, index) {
+    if (document.body.getAttribute('data-theme') === 'paper') {
+        return PAPER_GRAYS[index % PAPER_GRAYS.length];
+    }
     return CATEGORY_COLORS[category] || FALLBACK_COLORS[index % FALLBACK_COLORS.length];
 }
 

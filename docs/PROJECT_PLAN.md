@@ -63,9 +63,7 @@
 
 ---
 
-## Phase 1: Local Development ✅
-
-**Duration:** Completed (Feb 12, 2026)  
+## Phase 1: Local Development
 **Status:** ✅ Complete
 
 ### Objectives
@@ -93,8 +91,6 @@
 ---
 
 ## Phase 2: Testing & Refinement
-
-**Duration:** 7-10 days  
 **Status:** 🔄 In Progress
 
 ### Objectives
@@ -111,9 +107,7 @@
 - [ ] Add database integration tests
 - [ ] Set up test coverage reporting
 - [ ] Configure GitHub Actions for CI (no `.github/workflows` yet — tests are local-only)
-- [x] Add E2E testing with Playwright (pytest-playwright, `tests/e2e/test_*.py`) — a duplicate
-      TypeScript suite (`@playwright/test`) also existed briefly but was removed in favor of a
-      single Python-based suite to avoid maintaining two frameworks for the same coverage.
+- [x] Add E2E testing with Playwright (pytest-playwright, `tests/e2e/test_*.py`)
 
 #### 2.2 Feature Enhancements
 - [x] Add search functionality (`frontend/app.js` — client-side title filter)
@@ -139,6 +133,11 @@ Revisit this section if the app grows to multi-user or high-traffic use (matches
 - [x] Add empty state designs (`frontend/app.js` `describeEmptyState` — separate messages for empty bookmarks, no search matches, and no articles in category/time range, instead of one generic message that made no sense e.g. for a fresh bookmarks list)
 - [x] Implement keyboard shortcuts (`frontend/app.js` — `/` search, `Esc` clear/close, `1-8` category, `h`/`d`/`w` time range, `r` refresh, `?` help overlay)
 - [x] Add dark mode toggle (`frontend/styles.css`, `frontend/app.js`)
+- [x] Add a 4th "Paper" theme (`frontend/styles.css`, `frontend/index.html`) — black-and-white newsprint
+      palette with a serif font stack scoped to the theme, square (non-rounded) card/panel borders, and no
+      shadows. Category color-coding is intentionally dropped for this theme (newsprint reads by
+      typography, not color); the admin trends chart (`frontend/admin.js` `categoryColor()`) switches to a
+      grayscale palette when Paper is active, for the same reason.
 - [x] Improve mobile responsiveness (`frontend/index.html`/`styles.css`/`app.js` — sidebar converted to an off-canvas drawer with hamburger toggle on mobile instead of dumping in-flow above the feed; `frontend/feeds.css`/`feeds.js` — feed form stacks, table scrolls horizontally instead of overflowing the page)
 
 #### 2.5 Code Quality
@@ -228,8 +227,6 @@ segmented theme control still correctly drives `setTheme()`/`localStorage`.
 ---
 
 ## Phase 3: AWS Setup
-
-**Duration:** 4-5 days  
 **Status:** ⏳ Pending
 
 ### Objectives
@@ -273,17 +270,6 @@ flowchart TD
 ### Implementation Steps
 
 #### 3.1 AWS Account Setup (Day 1)
-```mermaid
-flowchart LR
-    A[Create AWS Account] --> B[Enable MFA]
-    B --> C[Create IAM User]
-    C --> D[Set Billing Alerts]
-    D --> E[Configure AWS CLI]
-    E --> F[Create Budget]
-    
-    style A fill:#FF9800
-    style F fill:#4CAF50
-```
 
 **Tasks:**
 - [ ] Create AWS account (or use existing)
@@ -333,8 +319,6 @@ flowchart LR
 ---
 
 ## Phase 4: Deployment to AWS
-
-**Duration:** 4-5 days  
 **Status:** ⏳ Pending
 
 ### Objectives

@@ -43,14 +43,57 @@ body[data-theme="sepia"] {
     --primary-dark: #78350f;
     --primary-light: #b45309;
     --secondary: #78716c;
-    --background: #fef3c7;
-    --surface: #fef9e7;
-    --surface-hover: #fef3c7;
-    --border: #fde68a;
+    --background: #f2e2c4;
+    --surface: #f7ecd8;
+    --surface-hover: #efdfbe;
+    --border: #e2c99b;
     --text: #451a03;
     --text-light: #78716c;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+}
+
+/* Paper Theme (newsprint) */
+body[data-theme="paper"] {
+    --primary: #1a1a1a;
+    --primary-dark: #000000;
+    --primary-light: #3a3a3a;
+    --secondary: #595959;
+    --background: #f2efe9;
+    --surface: #faf8f4;
+    --surface-hover: #ece8df;
+    --border: #1a1a1a;
+    --text: #1a1a1a;
+    --text-light: #595959;
+    --shadow: none;
+    --shadow-lg: none;
+}
+
+body[data-theme="paper"] {
+    font-family: Georgia, 'Times New Roman', Cambria, serif;
+}
+
+body[data-theme="paper"] .article-card {
+    border-radius: 0;
+    border: 1px solid var(--border);
+    border-left-width: 1px;
+    box-shadow: none;
+}
+
+body[data-theme="paper"] .article-card:hover {
+    transform: none;
+    box-shadow: none;
+    background: var(--surface-hover);
+}
+
+body[data-theme="paper"] .sidebar,
+body[data-theme="paper"] .top-bar,
+body[data-theme="paper"] .overview-card,
+body[data-theme="paper"] .feeds-form-card,
+body[data-theme="paper"] .feeds-list-card,
+body[data-theme="paper"] .trends-card {
+    box-shadow: none;
+    border-radius: 0;
 }
 
 body {
@@ -489,11 +532,16 @@ body {
     background: transparent;
     border: none;
     cursor: pointer;
-    font-size: 1.3rem;
     line-height: 1;
     color: var(--text-light);
     padding: 0;
     transition: transform 0.15s;
+}
+
+.bookmark-icon {
+    width: 1.3rem;
+    height: 1.3rem;
+    display: block;
 }
 
 .bookmark-btn:hover {
@@ -705,6 +753,11 @@ body[data-theme="sepia"] .article-card[data-category="company_blogs"] {
 
 body[data-theme="sepia"] .article-card[data-category="cricket"] {
     border-left-color: #713f12;
+}
+
+/* Category color coding - Paper (no color accents; newsprint reads by typography, not color) */
+body[data-theme="paper"] .article-card {
+    border-left-color: var(--border);
 }
 
 /* Responsive design */

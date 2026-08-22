@@ -7,6 +7,7 @@ let currentSearchQuery = '';
 let allArticles = [];
 let viewingBookmarks = false;
 let viewingHistory = false;
+let latestIngestion = null;
 
 // Initialize the page
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,7 +15,28 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     loadArticles();
     loadCategoryCounts();
+    loadLatestIngestion();
 });
+
+async function loadLatestIngestion() {
+    try {
+        const response = await fetch(`${API_BASE}/api/stats`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const stats = await response.json();
+        latestIngestion = stats.latest_ingestion;
+    } catch (error) {
+        console.error('Error loading latest ingestion time:', error);
+        latestIngestion = null;
+    }
+    renderLastUpdated();
+}
+
+function renderLastUpdated() {
+    const updateEl = document.getElementById('last-update');
+    updateEl.textContent = latestIngestion
+        ? `Data as of ${new Date(latestIngestion).toLocaleString()}`
+        : 'Data freshness unknown';
+}
 
 async function loadCategoryCounts() {
     try {
@@ -340,6 +362,10 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function starIconSvg(filled) {
+    return `<svg class="bookmark-icon" viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 15 9l7 1-5 5 1.5 7-6.5-3.5L5 22l1.5-7-5-5 7-1 3.5-6.5z"/></svg>`;
+}
+
 function createArticleCard(article) {
     const publishedDate = article.published_date
         ? new Date(article.published_date).toLocaleString()
@@ -375,7 +401,7 @@ function createArticleCard(article) {
                 <button class="bookmark-btn ${starred ? 'bookmarked' : ''}"
                         onclick="toggleBookmark(${article.id}, this)"
                         title="${starred ? 'Remove bookmark' : 'Bookmark this article'}">
-                    ${starred ? '⭐' : '☆'}
+                    ${starIconSvg(starred)}
                 </button>
             </div>
             <h2 class="article-title">
@@ -411,7 +437,7 @@ async function toggleBookmark(articleId, buttonEl) {
         }
 
         buttonEl.classList.toggle('bookmarked');
-        buttonEl.textContent = isBookmarked ? '☆' : '⭐';
+        buttonEl.innerHTML = starIconSvg(!isBookmarked);
         buttonEl.title = isBookmarked ? 'Bookmark this article' : 'Remove bookmark';
 
         const article = allArticles.find(a => a.id === articleId);
@@ -423,15 +449,14 @@ async function toggleBookmark(articleId, buttonEl) {
 
 function updateStats(count) {
     const countEl = document.getElementById('article-count');
-    const updateEl = document.getElementById('last-update');
-    
     countEl.textContent = `${count} article${count !== 1 ? 's' : ''} found`;
-    updateEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+    renderLastUpdated();
 }
 
 function refreshArticles() {
     loadArticles();
     loadCategoryCounts();
+    loadLatestIngestion();
 }
 
 function truncateText(text, maxLength) {
