@@ -1,7 +1,7 @@
 """Database connection and models for news aggregation platform."""
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 import os
 
@@ -31,6 +31,48 @@ class Article(Base):
 
     def __repr__(self):
         return f"<Article(id={self.id}, category={self.category}, title={self.title[:50]})>"
+
+
+class Bookmark(Base):
+    """Bookmark model for saving favorite articles."""
+    __tablename__ = "bookmarks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    article = relationship("Article")
+
+    def __repr__(self):
+        return f"<Bookmark(article_id={self.article_id})>"
+
+
+class ReadHistory(Base):
+    """Tracks articles the user has clicked through to read."""
+    __tablename__ = "read_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    visited_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    article = relationship("Article")
+
+    def __repr__(self):
+        return f"<ReadHistory(article_id={self.article_id}, visited_at={self.visited_at})>"
+
+
+class Feed(Base):
+    """RSS feed source, replacing the static feeds.json file."""
+    __tablename__ = "feeds"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String(50), nullable=False, index=True)
+    url = Column(String(1000), unique=True, nullable=False)
+    enabled = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<Feed(category={self.category}, url={self.url})>"
 
 
 def get_db():

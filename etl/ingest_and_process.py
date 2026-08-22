@@ -22,18 +22,48 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 DEFAULT_FEEDS_FILE = Path(__file__).resolve().parent / "feeds.json"
 
 
+def load_feeds_from_db() -> List[Dict[str, any]]:
+    """Load enabled feeds from the database, grouped by category.
+
+    Returns:
+        List of dicts with 'category' and 'urls' keys, or [] if the table
+        is empty / unavailable (caller should fall back to feeds.json).
+    """
+    try:
+        from backend.database import Feed, SessionLocal
+    except ImportError:
+        return []
+
+    db = SessionLocal()
+    try:
+        feeds = db.query(Feed).filter(Feed.enabled.is_(True)).order_by(Feed.category).all()
+        grouped: Dict[str, List[str]] = {}
+        for feed in feeds:
+            grouped.setdefault(feed.category, []).append(feed.url)
+        return [{"category": cat, "urls": urls} for cat, urls in grouped.items()]
+    except Exception:
+        return []
+    finally:
+        db.close()
+
+
 def load_categorized_feeds(feeds_file: str | Path = None) -> List[Dict[str, any]]:
-    """Load categorized feeds from JSON file.
-    
+    """Load categorized feeds, preferring the database over the JSON file.
+
     Returns:
         List of dicts with 'category' and 'urls' keys.
     """
+    if feeds_file is None:
+        db_feeds = load_feeds_from_db()
+        if db_feeds:
+            return db_feeds
+
     path = Path(feeds_file) if feeds_file else DEFAULT_FEEDS_FILE
     if not path.exists():
         raise FileNotFoundError(f"Feeds file not found: {path}")
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    
+
     # Support both old and new format
     if "feeds" in data:
         return data["feeds"]

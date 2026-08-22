@@ -25,70 +25,41 @@
 
 ### Technology Stack
 
-```mermaid
-mindmap
-  root((News Platform))
-    Backend
-      FastAPI
-      Python
-      SQLAlchemy
-    Frontend
-      HTML5
-      CSS3
-      JavaScript
-    Data
-      PostgreSQL
-      Pandas
-      RSS Feeds
-    Infrastructure
-      Docker
-      AWS ECS
-      AWS RDS
-      EventBridge
-    DevOps
-      GitHub
-      CI/CD
-      Monitoring
-```
+- **Backend:** FastAPI, Python, SQLAlchemy
+- **Frontend:** HTML5, CSS3, JavaScript
+- **Data:** PostgreSQL, Pandas, RSS Feeds
+- **Infrastructure:** Docker, AWS ECS, AWS RDS, EventBridge
+- **DevOps:** GitHub, CI/CD, Monitoring
 
 ---
 
 ## Implementation Phases
 
-```mermaid
-gantt
-    title Project Implementation Timeline
-    dateFormat  YYYY-MM-DD
-    section Phase 1: Local Development
-    Project Setup           :done, p1a, 2026-02-12, 1d
-    ETL Pipeline           :done, p1b, 2026-02-12, 1d
-    Database Layer         :done, p1c, 2026-02-12, 1d
-    Backend API            :done, p1d, 2026-02-12, 1d
-    Frontend UI            :done, p1e, 2026-02-12, 1d
-    
-    section Phase 2: Testing & Refinement
-    Local Testing          :active, p2a, 2026-02-13, 2d
-    Add Features           :p2b, 2026-02-15, 3d
-    Performance Tuning     :p2c, 2026-02-18, 2d
-    Documentation          :p2d, 2026-02-20, 2d
-    
-    section Phase 3: AWS Setup
-    AWS Account Setup      :p3a, 2026-02-22, 1d
-    RDS Configuration      :p3b, 2026-02-23, 1d
-    ECR Setup              :p3c, 2026-02-24, 1d
-    ECS Cluster            :p3d, 2026-02-25, 1d
-    
-    section Phase 4: Deployment
-    Initial Deployment     :p4a, 2026-02-26, 2d
-    ETL Scheduling         :p4b, 2026-02-28, 1d
-    DNS & SSL              :p4c, 2026-03-01, 1d
-    Monitoring Setup       :p4d, 2026-03-02, 1d
-    
-    section Phase 5: Production
-    Production Launch      :milestone, p5a, 2026-03-03, 0d
-    Performance Monitoring :p5b, 2026-03-03, 7d
-    Iteration & Updates    :p5c, 2026-03-10, 14d
-```
+- [**Phase 1: Local Development**](#phase-1-local-development-)
+  - Project Setup
+  - ETL Pipeline
+  - Database Layer
+  - Backend API
+  - Frontend UI
+- [**Phase 2: Testing & Refinement**](#phase-2-testing--refinement)
+  - Local Testing
+  - Add Features
+  - Performance Tuning
+  - Documentation
+- [**Phase 3: AWS Setup**](#phase-3-aws-setup)
+  - AWS Account Setup
+  - RDS Configuration
+  - ECR Setup
+  - ECS Cluster
+- [**Phase 4: Deployment**](#phase-4-deployment-to-aws)
+  - Initial Deployment
+  - ETL Scheduling
+  - DNS & SSL
+  - Monitoring Setup
+- [**Phase 5: Production**](#phase-5-production-operations)
+  - Production Launch
+  - Performance Monitoring
+  - Iteration & Updates
 
 ---
 
@@ -161,62 +132,41 @@ flowchart TD
 - Optimize performance
 - Refine user experience
 
-### Testing Strategy
-
-```mermaid
-flowchart LR
-    A[Testing Phase] --> B[Unit Tests]
-    A --> C[Integration Tests]
-    A --> D[User Testing]
-    A --> E[Performance Tests]
-    
-    B --> B1[ETL Functions]
-    B --> B2[API Endpoints]
-    B --> B3[Database Queries]
-    
-    C --> C1[End-to-End Flow]
-    C --> C2[Docker Setup]
-    
-    D --> D1[UI/UX]
-    D --> D2[Responsiveness]
-    
-    E --> E1[Load Testing]
-    E --> E2[Query Optimization]
-    
-    style A fill:#2196F3
-```
-
 ### Tasks Checklist
 
 #### 2.1 Automated Testing
-- [ ] Write pytest unit tests for ETL functions
-- [ ] Create API endpoint tests
+- [x] Write pytest unit tests for ETL functions (`etl/tests/test_ingest_and_process.py`)
+- [x] Create API endpoint tests (`tests/e2e/test_api.py`, `api.spec.ts`)
 - [ ] Add database integration tests
 - [ ] Set up test coverage reporting
-- [ ] Configure GitHub Actions for CI
+- [ ] Configure GitHub Actions for CI (no `.github/workflows` yet — tests are local-only)
+- [x] Add E2E testing with Playwright (`playwright.config.ts`, `tests/e2e/*.spec.ts`)
 
 #### 2.2 Feature Enhancements
-- [ ] Add search functionality
-- [ ] Implement article bookmarking/favorites
-- [ ] Add email notifications for new articles
-- [ ] Create admin dashboard
-- [ ] Add RSS feed management UI
-- [ ] Implement article preview/modal
+- [x] Add search functionality (`frontend/app.js` — client-side title filter)
+- [x] Implement article bookmarking/favorites (`backend/database.py` Bookmark model, `/api/bookmarks`, star button + Bookmarks view in frontend; bookmarked articles are excluded from the 7-day ETL purge)
+- [x] Add email notifications for new articles (weekly digest — `backend/digest.py`, `scripts/send_digest.py`; SMTP configured via `.env`, dry-run prints digest when unconfigured)
+- [ ] ~~Create admin dashboard~~ (skipped — the RSS feed management page at `/feeds.html` covers the near-term admin need; could be expanded into a fuller dashboard later)
+- [x] Add RSS feed management UI (`backend/database.py` Feed model, `/api/feeds` CRUD, `frontend/feeds.html` admin page; ETL now reads feeds from the database, falling back to `feeds.json`)
+- [ ] ~~Implement article preview/modal~~ (built then removed — the modal just echoed the card's own title/summary with no new information, so it added a click for no payoff)
+- [x] Add reading history (`backend/database.py` ReadHistory model, `/api/history` log/list/clear, sidebar History view; logs a click when an article title link is opened, re-visiting updates the timestamp rather than duplicating)
 
 #### 2.3 Performance Optimization
-- [ ] Add database indexing for common queries
-- [ ] Implement caching (Redis or in-memory)
-- [ ] Optimize frontend asset loading
-- [ ] Reduce API response times
-- [ ] Implement lazy loading for articles
+- [x] Add database indexing for common queries (`backend/database.py` — category, link, published_date, ingestion_timestamp indexed)
+- [ ] ~~Implement caching (Redis or in-memory)~~ (skipped — deferred as premature at current scale: ~1-2k articles, single user, indexed Postgres queries already return in single-digit ms)
+- [ ] ~~Optimize frontend asset loading~~ (skipped — hand-written `app.js`/`styles.css`, no bundler or heavy JS libs to optimize)
+- [ ] ~~Reduce API response times~~ (skipped — no measured latency problem to fix)
+- [ ] ~~Implement lazy loading for articles~~ (skipped — API responses capped at 100 articles; renders instantly as-is)
+
+Revisit this section if the app grows to multi-user or high-traffic use (matches the original Phase 3+ production vision); not worth the added complexity for personal/portfolio use today.
 
 #### 2.4 User Experience
-- [ ] Add loading states and skeletons
-- [ ] Improve error messages
-- [ ] Add empty state designs
-- [ ] Implement keyboard shortcuts
-- [ ] Add dark mode toggle
-- [ ] Improve mobile responsiveness
+- [ ] ~~Add loading states and skeletons~~ (skipped — local Postgres queries return fast enough that a loading state is barely perceptible; not worth the effort here)
+- [x] Improve error messages (`frontend/app.js` `describeLoadError` — distinguishes network failure, 5xx, 404, and bookmarks vs. articles context instead of one generic message)
+- [x] Add empty state designs (`frontend/app.js` `describeEmptyState` — separate messages for empty bookmarks, no search matches, and no articles in category/time range, instead of one generic message that made no sense e.g. for a fresh bookmarks list)
+- [x] Implement keyboard shortcuts (`frontend/app.js` — `/` search, `Esc` clear/close, `1-8` category, `h`/`d`/`w` time range, `r` refresh, `?` help overlay)
+- [x] Add dark mode toggle (`frontend/styles.css`, `frontend/app.js`)
+- [x] Improve mobile responsiveness (`frontend/index.html`/`styles.css`/`app.js` — sidebar converted to an off-canvas drawer with hamburger toggle on mobile instead of dumping in-flow above the feed; `frontend/feeds.css`/`feeds.js` — feed form stacks, table scrolls horizontally instead of overflowing the page)
 
 #### 2.5 Code Quality
 - [ ] Code review and refactoring
@@ -224,27 +174,6 @@ flowchart LR
 - [ ] Improve error handling
 - [ ] Add logging framework
 - [ ] Security audit (SQL injection, XSS)
-
-### Testing Workflow
-
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant Local as Local Environment
-    participant Tests as Test Suite
-    participant Docker as Docker Compose
-    participant Review as Code Review
-    
-    Dev->>Local: Make changes
-    Local->>Tests: Run unit tests
-    Tests-->>Dev: Test results
-    Dev->>Docker: Build & test
-    Docker-->>Dev: Integration results
-    Dev->>Review: Create PR
-    Review->>Tests: Run CI pipeline
-    Tests-->>Review: Pass/Fail
-    Review-->>Dev: Feedback
-```
 
 ---
 

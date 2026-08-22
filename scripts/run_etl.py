@@ -41,15 +41,17 @@ def wait_for_db(max_retries=30, delay=2):
 
 
 def cleanup_old_articles():
-    """Remove articles older than 7 days."""
+    """Remove articles older than 7 days, keeping any that are bookmarked."""
     try:
-        from backend.database import Article, SessionLocal
-        
+        from backend.database import Article, Bookmark, SessionLocal
+
         db = SessionLocal()
         cutoff_date = datetime.utcnow() - timedelta(days=7)
+        bookmarked_ids = db.query(Bookmark.article_id)
         deleted = db.query(Article).filter(
-            Article.ingestion_timestamp < cutoff_date
-        ).delete()
+            Article.ingestion_timestamp < cutoff_date,
+            Article.id.notin_(bookmarked_ids)
+        ).delete(synchronize_session=False)
         db.commit()
         db.close()
         

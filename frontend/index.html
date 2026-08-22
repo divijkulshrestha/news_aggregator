@@ -3,15 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personal News Aggregator</title>
+    <title>Divij's Digest</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
+    <!-- Mobile top bar -->
+    <header class="mobile-topbar">
+        <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Menu" aria-label="Open menu">☰</button>
+        <h1>📰 Divij's Digest</h1>
+    </header>
+
+    <!-- Sidebar backdrop (mobile only) -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
     <div class="app-layout">
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h1>📰 News</h1>
+                <h1>📰 Divij's Digest</h1>
+                <button id="sidebar-close" class="sidebar-close-btn" title="Close menu" aria-label="Close menu">&times;</button>
             </div>
 
             <div class="sidebar-section">
@@ -53,6 +64,20 @@
             </div>
 
             <div class="sidebar-section">
+                <h3 class="sidebar-title">Library</h3>
+                <nav class="category-nav">
+                    <button class="category-btn" id="bookmarks-btn">
+                        <span class="category-icon">⭐</span>
+                        <span>Bookmarks</span>
+                    </button>
+                    <button class="category-btn" id="history-btn">
+                        <span class="category-icon">🕘</span>
+                        <span>History</span>
+                    </button>
+                </nav>
+            </div>
+
+            <div class="sidebar-section">
                 <h3 class="sidebar-title">Appearance</h3>
                 <div class="theme-switcher">
                     <button class="theme-btn active" data-theme="light">
@@ -65,6 +90,20 @@
                         <span>📜 Sepia</span>
                     </button>
                 </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">More</h3>
+                <nav class="category-nav">
+                    <a class="category-btn" href="/feeds.html">
+                        <span class="category-icon">⚙️</span>
+                        <span>Manage Feeds</span>
+                    </a>
+                    <button class="category-btn" onclick="toggleShortcutsHelp()">
+                        <span class="category-icon">⌨️</span>
+                        <span>Keyboard Shortcuts</span>
+                    </button>
+                </nav>
             </div>
         </aside>
 
@@ -91,13 +130,34 @@
 
             <div class="stats">
                 <span id="article-count">Loading...</span>
-                <span id="last-update"></span>
+                <span class="stats-right">
+                    <button id="clear-history-btn" class="clear-history-btn" onclick="clearHistory()">Clear History</button>
+                    <span id="last-update"></span>
+                </span>
             </div>
 
             <div id="articles-container" class="articles-grid">
                 <div class="loading">Loading articles...</div>
             </div>
         </main>
+    </div>
+
+    <!-- Keyboard Shortcuts Help -->
+    <div id="shortcuts-help" class="shortcuts-help">
+        <div class="shortcuts-help-content">
+            <button class="modal-close" onclick="closeShortcutsHelp()" title="Close">&times;</button>
+            <h2>Keyboard Shortcuts</h2>
+            <table class="shortcuts-table">
+                <tr><td><kbd>/</kbd></td><td>Focus search</td></tr>
+                <tr><td><kbd>Esc</kbd></td><td>Clear search / close this dialog</td></tr>
+                <tr><td><kbd>1</kbd>–<kbd>8</kbd></td><td>Jump to category</td></tr>
+                <tr><td><kbd>h</kbd></td><td>Time range: last hour</td></tr>
+                <tr><td><kbd>d</kbd></td><td>Time range: last day</td></tr>
+                <tr><td><kbd>w</kbd></td><td>Time range: last week</td></tr>
+                <tr><td><kbd>r</kbd></td><td>Refresh articles</td></tr>
+                <tr><td><kbd>?</kbd></td><td>Show this help</td></tr>
+            </table>
+        </div>
     </div>
 
     <script src="/static/app.js"></script>

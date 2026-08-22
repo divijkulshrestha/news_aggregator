@@ -15,7 +15,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.database import get_db, Article, init_db
+from backend.database import get_db, Article, Bookmark, Feed, ReadHistory, init_db
 
 app = FastAPI(
     title="Personal News Aggregator",
@@ -43,6 +43,8 @@ class ArticleResponse(BaseModel):
     published_date: Optional[datetime]
     source_url: str
     ingestion_timestamp: datetime
+    is_bookmarked: bool = False
+    visited_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -52,6 +54,28 @@ class StatsResponse(BaseModel):
     total_articles: int
     categories: dict
     latest_ingestion: Optional[datetime]
+
+
+class FeedCreate(BaseModel):
+    category: str
+    url: str
+
+
+class FeedUpdate(BaseModel):
+    category: Optional[str] = None
+    url: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class FeedResponse(BaseModel):
+    id: int
+    category: str
+    url: str
+    enabled: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 @app.on_event("startup")
@@ -67,6 +91,15 @@ async def root():
     if os.path.exists(frontend_path):
         return FileResponse(frontend_path)
     return {"message": "Personal News Aggregator API", "docs": "/docs"}
+
+
+@app.get("/feeds.html")
+async def feeds_page():
+    """Serve the RSS feed management page."""
+    feeds_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "feeds.html")
+    if os.path.exists(feeds_path):
+        return FileResponse(feeds_path)
+    raise HTTPException(status_code=404, detail="Not found")
 
 
 @app.get("/api/articles", response_model=List[ArticleResponse])
@@ -105,8 +138,15 @@ async def get_articles(
         desc(Article.published_date),
         desc(Article.ingestion_timestamp)
     ).limit(limit).all()
-    
-    return articles
+
+    bookmarked_ids = {b.article_id for b in db.query(Bookmark.article_id).all()}
+    results = []
+    for article in articles:
+        response = ArticleResponse.model_validate(article)
+        response.is_bookmarked = article.id in bookmarked_ids
+        results.append(response)
+
+    return results
 
 
 @app.get("/api/categories")
@@ -145,13 +185,161 @@ async def get_stats(db: Session = Depends(get_db)):
 
 @app.delete("/api/cleanup")
 async def cleanup_old_articles(db: Session = Depends(get_db)):
-    """Remove articles older than 7 days."""
+    """Remove articles older than 7 days, keeping any that are bookmarked."""
     cutoff_date = datetime.utcnow() - timedelta(days=7)
+    bookmarked_ids = db.query(Bookmark.article_id)
     deleted = db.query(Article).filter(
-        Article.ingestion_timestamp < cutoff_date
-    ).delete()
+        Article.ingestion_timestamp < cutoff_date,
+        Article.id.notin_(bookmarked_ids)
+    ).delete(synchronize_session=False)
     db.commit()
     return {"message": f"Deleted {deleted} old articles"}
+
+
+# --- Bookmarks ---
+
+@app.get("/api/bookmarks", response_model=List[ArticleResponse])
+async def get_bookmarks(db: Session = Depends(get_db)):
+    """Get all bookmarked articles."""
+    articles = (
+        db.query(Article)
+        .join(Bookmark, Bookmark.article_id == Article.id)
+        .order_by(desc(Bookmark.created_at))
+        .all()
+    )
+    results = []
+    for article in articles:
+        response = ArticleResponse.model_validate(article)
+        response.is_bookmarked = True
+        results.append(response)
+    return results
+
+
+@app.post("/api/bookmarks/{article_id}", status_code=201)
+async def add_bookmark(article_id: int, db: Session = Depends(get_db)):
+    """Bookmark an article."""
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    existing = db.query(Bookmark).filter(Bookmark.article_id == article_id).first()
+    if existing:
+        return {"message": "Already bookmarked"}
+
+    db.add(Bookmark(article_id=article_id))
+    db.commit()
+    return {"message": "Bookmarked"}
+
+
+@app.delete("/api/bookmarks/{article_id}")
+async def remove_bookmark(article_id: int, db: Session = Depends(get_db)):
+    """Remove a bookmark."""
+    deleted = db.query(Bookmark).filter(Bookmark.article_id == article_id).delete()
+    db.commit()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Bookmark not found")
+    return {"message": "Bookmark removed"}
+
+
+# --- Read History ---
+
+@app.get("/api/history", response_model=List[ArticleResponse])
+async def get_history(
+    limit: int = Query(100, le=500, description="Maximum number of articles"),
+    db: Session = Depends(get_db)
+):
+    """Get articles the user has clicked through to read, most recent first."""
+    rows = (
+        db.query(Article, ReadHistory.visited_at)
+        .join(ReadHistory, ReadHistory.article_id == Article.id)
+        .order_by(desc(ReadHistory.visited_at))
+        .limit(limit)
+        .all()
+    )
+
+    bookmarked_ids = {b.article_id for b in db.query(Bookmark.article_id).all()}
+    results = []
+    for article, visited_at in rows:
+        response = ArticleResponse.model_validate(article)
+        response.is_bookmarked = article.id in bookmarked_ids
+        response.visited_at = visited_at
+        results.append(response)
+    return results
+
+
+@app.post("/api/history/{article_id}", status_code=201)
+async def log_history(article_id: int, db: Session = Depends(get_db)):
+    """Record that the user clicked through to read an article."""
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    existing = db.query(ReadHistory).filter(ReadHistory.article_id == article_id).first()
+    if existing:
+        existing.visited_at = datetime.utcnow()
+    else:
+        db.add(ReadHistory(article_id=article_id))
+    db.commit()
+    return {"message": "Logged"}
+
+
+@app.delete("/api/history")
+async def clear_history(db: Session = Depends(get_db)):
+    """Clear all read history."""
+    deleted = db.query(ReadHistory).delete()
+    db.commit()
+    return {"message": f"Cleared {deleted} history entries"}
+
+
+# --- RSS Feed Management ---
+
+@app.get("/api/feeds", response_model=List[FeedResponse])
+async def list_feeds(db: Session = Depends(get_db)):
+    """List all configured RSS feeds."""
+    return db.query(Feed).order_by(Feed.category, Feed.url).all()
+
+
+@app.post("/api/feeds", response_model=FeedResponse, status_code=201)
+async def create_feed(feed: FeedCreate, db: Session = Depends(get_db)):
+    """Add a new RSS feed."""
+    existing = db.query(Feed).filter(Feed.url == feed.url).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Feed URL already exists")
+
+    new_feed = Feed(category=feed.category, url=feed.url, enabled=True)
+    db.add(new_feed)
+    db.commit()
+    db.refresh(new_feed)
+    return new_feed
+
+
+@app.patch("/api/feeds/{feed_id}", response_model=FeedResponse)
+async def update_feed(feed_id: int, updates: FeedUpdate, db: Session = Depends(get_db)):
+    """Update a feed's category, URL, or enabled status."""
+    feed = db.query(Feed).filter(Feed.id == feed_id).first()
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+
+    if updates.category is not None:
+        feed.category = updates.category
+    if updates.url is not None:
+        feed.url = updates.url
+    if updates.enabled is not None:
+        feed.enabled = updates.enabled
+
+    db.commit()
+    db.refresh(feed)
+    return feed
+
+
+@app.delete("/api/feeds/{feed_id}")
+async def delete_feed(feed_id: int, db: Session = Depends(get_db)):
+    """Delete an RSS feed."""
+    deleted = db.query(Feed).filter(Feed.id == feed_id).delete()
+    db.commit()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Feed not found")
+    return {"message": "Feed deleted"}
 
 
 # Mount static files for frontend

@@ -80,13 +80,57 @@ body {
     transition: background-color 0.3s, border-color 0.3s;
 }
 
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border);
+}
+
 .sidebar-header h1 {
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--text);
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid var(--border);
+}
+
+/* Mobile top bar + drawer controls (hidden on desktop) */
+.mobile-topbar {
+    display: none;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.mobile-topbar h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.sidebar-toggle-btn,
+.sidebar-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--text);
+    cursor: pointer;
+    padding: 0.25rem;
+}
+
+.sidebar-close-btn {
+    display: none;
+}
+
+.sidebar-backdrop {
+    display: none;
 }
 
 .sidebar-section {
@@ -123,6 +167,8 @@ body {
     cursor: pointer;
     transition: all 0.2s;
     text-align: left;
+    text-decoration: none;
+    width: 100%;
 }
 
 .category-btn:hover {
@@ -265,6 +311,7 @@ body {
 .stats {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     padding: 1rem 1.5rem;
     background: var(--surface);
     border-radius: 8px;
@@ -272,6 +319,28 @@ body {
     font-size: 0.9rem;
     color: var(--text-light);
     box-shadow: var(--shadow);
+}
+
+.stats-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.clear-history-btn {
+    display: none;
+    background: transparent;
+    border: 1px solid #dc2626;
+    color: #dc2626;
+    border-radius: 6px;
+    padding: 0.35rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.clear-history-btn:hover {
+    background: #dc2626;
+    color: white;
 }
 
 .articles-grid {
@@ -293,6 +362,13 @@ body {
     box-shadow: var(--shadow-lg);
 }
 
+.article-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
 .article-category {
     display: inline-block;
     padding: 0.25rem 0.75rem;
@@ -302,7 +378,101 @@ body {
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
-    margin-bottom: 0.75rem;
+}
+
+.bookmark-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.3rem;
+    line-height: 1;
+    color: var(--text-light);
+    padding: 0;
+    transition: transform 0.15s;
+}
+
+.bookmark-btn:hover {
+    transform: scale(1.15);
+}
+
+.bookmark-btn.bookmarked {
+    color: #f59e0b;
+}
+
+/* Keyboard Shortcuts Help */
+.shortcuts-help {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.shortcuts-help.open {
+    display: flex;
+}
+
+.shortcuts-help-content {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+}
+
+.modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: transparent;
+    border: none;
+    font-size: 1.75rem;
+    line-height: 1;
+    color: var(--text-light);
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    color: var(--text);
+}
+
+.shortcuts-help-content h2 {
+    font-size: 1.2rem;
+    margin-bottom: 1.25rem;
+    padding-right: 2rem;
+}
+
+.shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.shortcuts-table td {
+    padding: 0.5rem 0;
+    color: var(--text);
+    font-size: 0.9rem;
+}
+
+.shortcuts-table td:first-child {
+    white-space: nowrap;
+    padding-right: 1rem;
+    width: 1%;
+}
+
+kbd {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--background);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
 }
 
 .article-title {
@@ -399,6 +569,39 @@ body {
     border-left-color: #059669;
 }
 
+/* Category color coding - Sepia (muted warm tones so accents don't clash) */
+body[data-theme="sepia"] .article-card[data-category="top_stories"] {
+    border-left-color: #b91c1c;
+}
+
+body[data-theme="sepia"] .article-card[data-category="india"] {
+    border-left-color: #c2410c;
+}
+
+body[data-theme="sepia"] .article-card[data-category="world"] {
+    border-left-color: #92400e;
+}
+
+body[data-theme="sepia"] .article-card[data-category="business_finance"] {
+    border-left-color: #854d0e;
+}
+
+body[data-theme="sepia"] .article-card[data-category="science_history"] {
+    border-left-color: #78350f;
+}
+
+body[data-theme="sepia"] .article-card[data-category="technology"] {
+    border-left-color: #7c2d12;
+}
+
+body[data-theme="sepia"] .article-card[data-category="company_blogs"] {
+    border-left-color: #a16207;
+}
+
+body[data-theme="sepia"] .article-card[data-category="cricket"] {
+    border-left-color: #713f12;
+}
+
 /* Responsive design */
 @media (max-width: 1024px) {
     :root {
@@ -407,12 +610,45 @@ body {
 }
 
 @media (max-width: 768px) {
+    .mobile-topbar {
+        display: flex;
+    }
+
+    .sidebar-close-btn {
+        display: block;
+    }
+
+    /* Off-canvas drawer instead of in-flow stacking */
     .sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
-        border-right: none;
-        border-bottom: 1px solid var(--border);
+        width: min(85vw, 320px);
+        height: 100vh;
+        position: fixed;
+        top: 0;
+        left: 0;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        z-index: 210;
+        border-right: 1px solid var(--border);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 200;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+    }
+
+    .sidebar-backdrop.open {
+        opacity: 1;
+        pointer-events: auto;
     }
 
     .main-content {

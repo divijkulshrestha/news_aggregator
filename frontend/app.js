@@ -5,6 +5,8 @@ let currentCategory = 'top_stories';
 let currentTimeRange = '1d';
 let currentSearchQuery = '';
 let allArticles = [];
+let viewingBookmarks = false;
+let viewingHistory = false;
 
 // Initialize the page
 document.addEventListener('DOMContentLoaded', () => {
@@ -30,29 +32,19 @@ function setTheme(theme) {
 
 function setupEventListeners() {
     // Category filters
-    document.querySelectorAll('.category-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            // Update active state
-            document.querySelectorAll('.category-btn').forEach(b => 
-                b.classList.remove('active'));
-            e.target.closest('.category-btn').classList.add('active');
-            
-            currentCategory = e.target.closest('.category-btn').dataset.category;
-            loadArticles();
-        });
+    document.querySelectorAll('.category-btn[data-category]').forEach(btn => {
+        btn.addEventListener('click', () => selectCategory(btn.dataset.category));
     });
+
+    // Bookmarks view
+    document.getElementById('bookmarks-btn').addEventListener('click', selectBookmarksView);
+
+    // History view
+    document.getElementById('history-btn').addEventListener('click', selectHistoryView);
 
     // Time range filters
     document.querySelectorAll('.time-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            // Update active state
-            document.querySelectorAll('.time-btn').forEach(b => 
-                b.classList.remove('active'));
-            e.target.classList.add('active');
-            
-            currentTimeRange = e.target.dataset.time;
-            loadArticles();
-        });
+        btn.addEventListener('click', () => selectTimeRange(btn.dataset.time));
     });
 
     // Theme switcher
@@ -73,6 +65,154 @@ function setupEventListeners() {
             filterAndDisplayArticles();
         }, 300); // Debounce for 300ms
     });
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            searchInput.value = '';
+            currentSearchQuery = '';
+            filterAndDisplayArticles();
+            searchInput.blur();
+        }
+    });
+
+    document.getElementById('shortcuts-help').addEventListener('click', (e) => {
+        if (e.target.id === 'shortcuts-help') closeShortcutsHelp();
+    });
+
+    // Mobile sidebar drawer
+    document.getElementById('sidebar-toggle').addEventListener('click', openSidebar);
+    document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
+    document.getElementById('sidebar-backdrop').addEventListener('click', closeSidebar);
+    document.querySelectorAll('.category-btn, #bookmarks-btn, #history-btn').forEach(btn => {
+        btn.addEventListener('click', closeSidebar);
+    });
+
+    setupKeyboardShortcuts();
+}
+
+function openSidebar() {
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('sidebar-backdrop').classList.add('open');
+}
+
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-backdrop').classList.remove('open');
+}
+
+function selectCategory(category) {
+    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector(`.category-btn[data-category="${category}"]`);
+    if (btn) btn.classList.add('active');
+
+    viewingBookmarks = false;
+    viewingHistory = false;
+    currentCategory = category;
+    updateViewToggles();
+    loadArticles();
+}
+
+function selectBookmarksView() {
+    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('bookmarks-btn').classList.add('active');
+
+    viewingBookmarks = true;
+    viewingHistory = false;
+    updateViewToggles();
+    loadArticles();
+}
+
+function selectHistoryView() {
+    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('history-btn').classList.add('active');
+
+    viewingBookmarks = false;
+    viewingHistory = true;
+    updateViewToggles();
+    loadArticles();
+}
+
+function updateViewToggles() {
+    document.getElementById('clear-history-btn').style.display = viewingHistory ? 'inline-block' : 'none';
+}
+
+async function clearHistory() {
+    if (!confirm('Clear all read history?')) return;
+    try {
+        const response = await fetch(`${API_BASE}/api/history`, { method: 'DELETE' });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        loadArticles();
+    } catch (error) {
+        console.error('Error clearing history:', error);
+    }
+}
+
+async function logHistory(articleId) {
+    try {
+        await fetch(`${API_BASE}/api/history/${articleId}`, { method: 'POST' });
+    } catch (error) {
+        console.error('Error logging history:', error);
+    }
+}
+
+function selectTimeRange(time) {
+    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector(`.time-btn[data-time="${time}"]`);
+    if (btn) btn.classList.add('active');
+
+    currentTimeRange = time;
+    loadArticles();
+}
+
+const TIME_RANGE_KEYS = { h: '1h', d: '1d', w: '7d' };
+
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        const searchInput = document.getElementById('search-input');
+        const isTyping = document.activeElement === searchInput;
+
+        // '/' focuses search regardless of current focus (unless already typing)
+        if (e.key === '/' && !isTyping) {
+            e.preventDefault();
+            searchInput.focus();
+            return;
+        }
+
+        if (e.key === '?' && !isTyping) {
+            e.preventDefault();
+            toggleShortcutsHelp();
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            closeShortcutsHelp();
+            closeSidebar();
+            if (isTyping) searchInput.blur();
+            return;
+        }
+
+        if (isTyping) return; // don't hijack other keys while typing
+
+        if (e.key === 'r') {
+            e.preventDefault();
+            refreshArticles();
+        } else if (e.key in TIME_RANGE_KEYS) {
+            e.preventDefault();
+            selectTimeRange(TIME_RANGE_KEYS[e.key]);
+        } else if (e.key >= '1' && e.key <= '8') {
+            e.preventDefault();
+            const categoryBtns = document.querySelectorAll('.category-btn[data-category]');
+            const btn = categoryBtns[parseInt(e.key, 10) - 1];
+            if (btn) selectCategory(btn.dataset.category);
+        }
+    });
+}
+
+function toggleShortcutsHelp() {
+    document.getElementById('shortcuts-help').classList.toggle('open');
+}
+
+function closeShortcutsHelp() {
+    document.getElementById('shortcuts-help').classList.remove('open');
 }
 
 async function loadArticles() {
@@ -80,33 +220,54 @@ async function loadArticles() {
     container.innerHTML = '<div class="loading">Loading articles...</div>';
 
     try {
-        // Build query parameters
-        const params = new URLSearchParams({
-            time_range: currentTimeRange,
-            limit: 100
-        });
+        let url;
+        if (viewingHistory) {
+            url = `${API_BASE}/api/history`;
+        } else if (viewingBookmarks) {
+            url = `${API_BASE}/api/bookmarks`;
+        } else {
+            const params = new URLSearchParams({
+                time_range: currentTimeRange,
+                limit: 100
+            });
+            params.append('category', currentCategory);
+            url = `${API_BASE}/api/articles?${params}`;
+        }
 
-        // Always filter by current category (no 'all' option anymore)
-        params.append('category', currentCategory);
+        const response = await fetch(url);
 
-        const response = await fetch(`${API_BASE}/api/articles?${params}`);
-        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const err = new Error(`HTTP ${response.status}`);
+            err.status = response.status;
+            throw err;
         }
 
         allArticles = await response.json();
         filterAndDisplayArticles();
-        
+
     } catch (error) {
         console.error('Error loading articles:', error);
-        container.innerHTML = `
-            <div class="error">
-                Failed to load articles. Please check if the backend is running.
-                <br><small>${error.message}</small>
-            </div>
-        `;
+        container.innerHTML = `<div class="error">${describeLoadError(error)}</div>`;
     }
+}
+
+function describeLoadError(error) {
+    const subject = viewingHistory ? 'your history' : viewingBookmarks ? 'your bookmarks' : 'articles';
+
+    if (error instanceof TypeError) {
+        // fetch() throws TypeError for network-level failures (server down, no connection, CORS)
+        return `Can't reach the server. Is the backend running?<br><small>Tried to load ${subject} from ${API_BASE}</small>`;
+    }
+
+    if (error.status >= 500) {
+        return `The server ran into a problem loading ${subject} (HTTP ${error.status}).<br><small>Try refreshing in a moment.</small>`;
+    }
+
+    if (error.status === 404) {
+        return `Couldn't find ${subject} (HTTP 404).<br><small>This may be a temporary issue — try refreshing.</small>`;
+    }
+
+    return `Failed to load ${subject} (HTTP ${error.status || 'unknown'}).<br><small>${error.message}</small>`;
 }
 
 function filterAndDisplayArticles() {
@@ -125,18 +286,41 @@ function filterAndDisplayArticles() {
 
 function displayArticles(articles) {
     const container = document.getElementById('articles-container');
-    
+
     if (articles.length === 0) {
-        container.innerHTML = `
-            <div class="no-articles">
-                No articles found for the selected filters.
-                <br>Try adjusting your time range or category.
-            </div>
-        `;
+        container.innerHTML = `<div class="no-articles">${describeEmptyState()}</div>`;
         return;
     }
 
     container.innerHTML = articles.map(article => createArticleCard(article)).join('');
+}
+
+function describeEmptyState() {
+    if (viewingHistory) {
+        if (currentSearchQuery) {
+            return `No history matches "${escapeHtml(currentSearchQuery)}".<br>Try a different search term.`;
+        }
+        return `🕘 No reading history yet.<br>Articles you click through to read will show up here.`;
+    }
+
+    if (viewingBookmarks) {
+        if (currentSearchQuery) {
+            return `No bookmarks match "${escapeHtml(currentSearchQuery)}".<br>Try a different search term.`;
+        }
+        return `⭐ No bookmarks yet.<br>Click the star on any article to save it here.`;
+    }
+
+    if (currentSearchQuery) {
+        return `No headlines match "${escapeHtml(currentSearchQuery)}".<br>Try a different search term or time range.`;
+    }
+
+    return `No articles found for this category and time range.<br>Try "Last Week" or a different category.`;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 function createArticleCard(article) {
@@ -155,12 +339,24 @@ function createArticleCard(article) {
         : 'No summary available';
     
     const sourceHost = extractHostname(article.source_url);
+    const starred = article.is_bookmarked;
+
+    const visitedMeta = article.visited_at
+        ? `<span class="article-date">🕘 Read ${new Date(article.visited_at).toLocaleString()}</span>`
+        : '';
 
     return `
         <div class="article-card" data-category="${article.category}">
-            <span class="article-category">${categoryLabel}</span>
+            <div class="article-card-header">
+                <span class="article-category">${categoryLabel}</span>
+                <button class="bookmark-btn ${starred ? 'bookmarked' : ''}"
+                        onclick="toggleBookmark(${article.id}, this)"
+                        title="${starred ? 'Remove bookmark' : 'Bookmark this article'}">
+                    ${starred ? '⭐' : '☆'}
+                </button>
+            </div>
             <h2 class="article-title">
-                <a href="${article.link}" target="_blank" rel="noopener noreferrer">
+                <a href="${article.link}" target="_blank" rel="noopener noreferrer" onclick="logHistory(${article.id})">
                     ${article.title}
                 </a>
             </h2>
@@ -168,9 +364,38 @@ function createArticleCard(article) {
             <div class="article-meta">
                 <span class="article-source">📡 ${sourceHost}</span>
                 <span class="article-date">🕒 ${publishedDate}</span>
+                ${visitedMeta}
             </div>
         </div>
     `;
+}
+
+async function toggleBookmark(articleId, buttonEl) {
+    const isBookmarked = buttonEl.classList.contains('bookmarked');
+    try {
+        const response = await fetch(`${API_BASE}/api/bookmarks/${articleId}`, {
+            method: isBookmarked ? 'DELETE' : 'POST'
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        if (viewingBookmarks && isBookmarked) {
+            // Removing from the bookmarks view - drop the card entirely
+            allArticles = allArticles.filter(a => a.id !== articleId);
+            filterAndDisplayArticles();
+            return;
+        }
+
+        buttonEl.classList.toggle('bookmarked');
+        buttonEl.textContent = isBookmarked ? '☆' : '⭐';
+        buttonEl.title = isBookmarked ? 'Bookmark this article' : 'Remove bookmark';
+
+        const article = allArticles.find(a => a.id === articleId);
+        if (article) article.is_bookmarked = !isBookmarked;
+    } catch (error) {
+        console.error('Error toggling bookmark:', error);
+    }
 }
 
 function updateStats(count) {
