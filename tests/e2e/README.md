@@ -48,6 +48,10 @@ pytest tests/e2e/test_homepage.py -v
 python run_e2e_tests.py
 ```
 
+> This is a Python-only Playwright suite (pytest-playwright). A parallel TypeScript
+> (`@playwright/test`) suite existed briefly covering the same scenarios and was removed to
+> avoid maintaining two frameworks for identical coverage.
+
 ## Test Structure
 
 ```

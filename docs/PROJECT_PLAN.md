@@ -107,11 +107,13 @@
 
 #### 2.1 Automated Testing
 - [x] Write pytest unit tests for ETL functions (`etl/tests/test_ingest_and_process.py`)
-- [x] Create API endpoint tests (`tests/e2e/test_api.py`, `api.spec.ts`)
+- [x] Create API endpoint tests (`tests/e2e/test_api.py`)
 - [ ] Add database integration tests
 - [ ] Set up test coverage reporting
 - [ ] Configure GitHub Actions for CI (no `.github/workflows` yet — tests are local-only)
-- [x] Add E2E testing with Playwright (`playwright.config.ts`, `tests/e2e/*.spec.ts`)
+- [x] Add E2E testing with Playwright (pytest-playwright, `tests/e2e/test_*.py`) — a duplicate
+      TypeScript suite (`@playwright/test`) also existed briefly but was removed in favor of a
+      single Python-based suite to avoid maintaining two frameworks for the same coverage.
 
 #### 2.2 Feature Enhancements
 - [x] Add search functionality (`frontend/app.js` — client-side title filter)

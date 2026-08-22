@@ -55,11 +55,11 @@ class TestArticles:
         
         # Click refresh button
         page.click(".refresh-btn")
-        
-        # Wait for loading state
-        page.wait_for_selector(".loading", state="visible")
+
+        # The loading state can flash by faster than Playwright can observe it when
+        # articles are served from a warm local DB, so just wait for it to settle.
         page.wait_for_selector(".loading", state="hidden", timeout=10000)
-        
+
         # Verify articles were refreshed (count should still be displayed)
         new_count = page.locator("#article-count").text_content()
         assert new_count != "Loading..."
