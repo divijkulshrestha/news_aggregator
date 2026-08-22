@@ -13,7 +13,23 @@ document.addEventListener('DOMContentLoaded', () => {
     loadThemePreference();
     setupEventListeners();
     loadArticles();
+    loadCategoryCounts();
 });
+
+async function loadCategoryCounts() {
+    try {
+        const response = await fetch(`${API_BASE}/api/categories?time_range=${currentTimeRange}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const categories = await response.json();
+
+        const countsByCategory = Object.fromEntries(categories.map(c => [c.category, c.count]));
+        document.querySelectorAll('.category-count').forEach(el => {
+            el.textContent = countsByCategory[el.dataset.countFor] || 0;
+        });
+    } catch (error) {
+        console.error('Error loading category counts:', error);
+    }
+}
 
 function loadThemePreference() {
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -161,6 +177,7 @@ function selectTimeRange(time) {
 
     currentTimeRange = time;
     loadArticles();
+    loadCategoryCounts();
 }
 
 const TIME_RANGE_KEYS = { h: '1h', d: '1d', w: '7d' };
@@ -414,6 +431,7 @@ function updateStats(count) {
 
 function refreshArticles() {
     loadArticles();
+    loadCategoryCounts();
 }
 
 function truncateText(text, maxLength) {

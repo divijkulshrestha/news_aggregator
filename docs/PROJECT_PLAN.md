@@ -119,8 +119,8 @@
 - [x] Add search functionality (`frontend/app.js` — client-side title filter)
 - [x] Implement article bookmarking/favorites (`backend/database.py` Bookmark model, `/api/bookmarks`, star button + Bookmarks view in frontend; bookmarked articles are excluded from the 7-day ETL purge)
 - [x] Add email notifications for new articles (weekly digest — `backend/digest.py`, `scripts/send_digest.py`; SMTP configured via `.env`, dry-run prints digest when unconfigured)
-- [ ] ~~Create admin dashboard~~ (skipped — the RSS feed management page at `/feeds.html` covers the near-term admin need; could be expanded into a fuller dashboard later)
-- [x] Add RSS feed management UI (`backend/database.py` Feed model, `/api/feeds` CRUD, `frontend/feeds.html` admin page; ETL now reads feeds from the database, falling back to `feeds.json`)
+- [x] Create admin dashboard (revisited — expanded from the RSS feed management page into a full admin panel with health/stats; see 2.6 below)
+- [x] Add RSS feed management UI (`backend/database.py` Feed model, `/api/feeds` CRUD, `frontend/admin.html` admin page; ETL now reads feeds from the database, falling back to `feeds.json`)
 - [ ] ~~Implement article preview/modal~~ (built then removed — the modal just echoed the card's own title/summary with no new information, so it added a click for no payoff)
 - [x] Add reading history (`backend/database.py` ReadHistory model, `/api/history` log/list/clear, sidebar History view; logs a click when an article title link is opened, re-visiting updates the timestamp rather than duplicating)
 
@@ -147,6 +147,83 @@ Revisit this section if the app grows to multi-user or high-traffic use (matches
 - [x] Improve error handling
 - [x] Add logging framework (`backend/logging_config.py` — stdlib `logging` to stdout/stderr via `basicConfig`, `LOG_LEVEL` env var; replaces `print()` in `backend/`, `etl/`, `scripts/`; exception sites use `logger.exception()` to capture tracebacks. Deliberately not logging to the DB — stdout is picked up by the container log driver (Docker locally, CloudWatch on ECS) with no extra write path or failure mode to manage.)
 - [x] Security audit (SQL injection, XSS) — stored XSS (`escapeHtml` in `frontend/app.js`), SSRF on feed URLs (`url_safety.py`), hardcoded DB credential fallback, and a duplicated unauthenticated cleanup endpoint were found and fixed. Two findings remain open, deliberately deferred: no auth on the feeds admin page/API (acceptable for a single-user personal tool, not exposed publicly) and a CORS config with `allow_origins=["*"]` + `allow_credentials=True` (unsafe combo, browsers already reject it, but worth tightening if this is ever exposed beyond localhost).
+
+#### 2.6 Admin Panel: Health & Stats
+
+Motivation: this project is a resume piece and reads more as "backend engineer who also built an ETL job"
+than "data engineer." Rather than bolt on a separate analytics stack (Airflow, dbt), this extends the
+existing feed-management page into a real admin panel by adding two lightweight, DE-flavored pieces on top
+of ingestion the app already does: batch aggregation (rollup stats) and data quality monitoring (feed
+health). A frontend trends visualization (item 4 below) is deliberately deferred — the API/data layer is
+the priority; the chart is a later nice-to-have.
+
+- [x] Add `FeedRun` table (`backend/database.py`) — one row per feed per ETL run: `feed_id` (FK), `run_at`,
+      `success` (bool), `articles_fetched` (int), `error_message` (nullable). Recorded by
+      `record_feed_run()` in `etl/ingest_and_process.py` after each feed fetch attempt. This is the source
+      of truth for feed health (last success, consecutive failures, rolling success rate) — no separate
+      status table needed. Feeds loaded from `feeds.json` (no DB id) are skipped, not errored.
+- [x] Add `DailyStats` table (`backend/database.py`) — one row per `(date, category)`: `articles_ingested`
+      (int), unique on `(date, category)`. Upserted at the end of each ETL run by `compute_daily_stats()`
+      (`backend/stats.py`, called from `scripts/run_etl.py`), so re-running the same day recomputes rather
+      than double-counts.
+- [x] Add admin API endpoints: `GET /api/admin/stats/overview` (total articles, articles today, per-category
+      counts over last 7/30 days, last successful ETL run time) and `GET /api/admin/feeds/health` (per-feed
+      enabled state, last run time/status, consecutive failure count, rolling success rate over the last 20
+      runs).
+- [x] Renamed `frontend/feeds.html`/`feeds.js`/`feeds.css` → `admin.html`/`admin.js`/`admin.css`; updated the
+      `/feeds.html` route in `backend/app.py` to `/admin.html`, and the sidebar link in `frontend/index.html`
+      ("Manage Feeds" → "Admin Panel"). Page now has an overview-cards section (total articles, articles
+      today, active feeds, feeds currently failing, last successful run) and health columns on the feed
+      table (last run ✅/❌, consecutive failures highlighted red when ≥3, rolling success rate). Verified
+      end-to-end via a real ETL run against live feeds (Docker) plus Playwright checks of light/dark/mobile
+      rendering.
+- [x] Add category trend chart to the admin panel — revisited from "deferred." New endpoint
+      `GET /api/admin/stats/trends?days=N` (7/30 day toggle in the UI) reads `DailyStats` and returns a
+      dense, zero-filled date-indexed series per category. Rendered as a hand-rolled multi-line SVG chart
+      (`frontend/admin.js` `renderTrendsChart`/`admin.css`, no charting library) with gridlines, axis
+      labels, and a color-coded legend reusing the app's existing per-category accent colors. Verified with
+      Playwright across light/dark theme and both range toggles, including a manual multi-day data backfill
+      to confirm the chart reads correctly once more than one day of `DailyStats` history exists.
+
+No new scheduling infrastructure: both new writes piggyback on the existing `scripts/run_etl.py`
+cron/EventBridge trigger, keeping this a downstream-of-ingestion batch step rather than a new pipeline.
+
+#### 2.7 Sidebar Polish
+
+Revisited after a fresh look at the sidebar mid-2.2/2.4 work — it read as generic/template-like. Scoped to
+three concrete fixes rather than a full redesign.
+
+- [x] Per-category article counts, scoped to the active time range (not all-time) so the number next to a
+      category matches what you'd actually see if you clicked it. `GET /api/categories` gained an optional
+      `time_range` query param (shared `_time_range_cutoff()` helper with `/api/articles`); counts refresh
+      on time-range change and on manual refresh (`loadCategoryCounts()` in `frontend/app.js`). A category
+      with zero matches for the range explicitly renders `0`, not a blank badge.
+- [x] Replaced all sidebar emoji (categories, Library, Appearance, More) with a consistent hand-drawn
+      inline SVG icon set (`stroke="currentColor"`, no external icon library/CDN) — icons now inherit the
+      button's text color, so they theme correctly across light/dark/sepia and the active/selected state,
+      which fixed-color emoji couldn't do.
+- [x] Added a sidebar footer (`Divij's Digest v1.0`) anchored to the bottom via `.sidebar { display: flex;
+      flex-direction: column }` + `margin-top: auto`, giving the sidebar a visual close instead of just
+      trailing off after "More."
+- [x] Visual hierarchy: "Categories" promoted to a bolder, darker primary label (`sidebar-title-primary`);
+      "Library" pulled into the same visual cluster (no divider, tight spacing) since it's also navigation;
+      "Appearance" and "More" demoted to a lighter secondary cluster (`sidebar-title-secondary`, smaller
+      font, reduced opacity) separated from the nav cluster by one thin `.sidebar-divider`, since they're
+      settings rather than navigation.
+- [x] Theme switcher rebuilt as a one-row segmented control (icon + label stacked per segment, filled pill
+      on the active segment) instead of three stacked full-width buttons — cut that section's height by
+      roughly two-thirds.
+- [x] Tightened spacing sidebar-wide (`.category-nav` gap, `.category-btn` padding, `.sidebar-section`
+      margins) and gave "More" a visually lighter, more compact treatment (`category-btn-compact`) — the
+      full category+library+appearance+more stack now fits without scrolling on a standard mobile drawer
+      (844px) and comes close to fitting on a 900px desktop viewport, down from needing a full scroll.
+- [x] Custom thin scrollbar for the sidebar's own overflow (`scrollbar-width: thin` for Firefox,
+      `::-webkit-scrollbar` for Chromium/Edge), themed via `--border`/`--text-light` instead of the
+      OS-default scrollbar, for whenever content still exceeds the viewport.
+
+Verified via Playwright across light/dark/sepia themes, the mobile off-canvas drawer, and time-range
+switching (confirmed counts actually change, including a genuine zero-count category), plus confirmed the
+segmented theme control still correctly drives `setTheme()`/`localStorage`.
 
 ---
 

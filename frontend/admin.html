@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Divij's Digest</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+    <div class="admin-page">
+        <header class="admin-header">
+            <h1>⚙️ Admin Panel</h1>
+            <a href="/" class="refresh-btn">← Back to Digest</a>
+        </header>
+
+        <section class="admin-overview">
+            <div class="overview-card">
+                <span class="overview-label">Total Articles</span>
+                <span class="overview-value" id="stat-total-articles">—</span>
+            </div>
+            <div class="overview-card">
+                <span class="overview-label">Articles Today</span>
+                <span class="overview-value" id="stat-articles-today">—</span>
+            </div>
+            <div class="overview-card">
+                <span class="overview-label">Active Feeds</span>
+                <span class="overview-value" id="stat-active-feeds">—</span>
+            </div>
+            <div class="overview-card">
+                <span class="overview-label">Feeds Failing</span>
+                <span class="overview-value" id="stat-feeds-failing">—</span>
+            </div>
+            <div class="overview-card overview-card-wide">
+                <span class="overview-label">Last Successful ETL Run</span>
+                <span class="overview-value overview-value-small" id="stat-last-run">—</span>
+            </div>
+        </section>
+
+        <section class="trends-card">
+            <div class="trends-header">
+                <h2>Articles Ingested by Category</h2>
+                <div class="trends-range-toggle">
+                    <button class="trends-range-btn" data-days="7">7d</button>
+                    <button class="trends-range-btn active" data-days="30">30d</button>
+                </div>
+            </div>
+            <div id="trends-chart-container">
+                <div class="loading">Loading trends...</div>
+            </div>
+        </section>
+
+        <section class="feeds-form-card">
+            <h2>Add Feed</h2>
+            <form id="add-feed-form" class="feeds-form">
+                <input type="text" id="new-category" placeholder="Category (e.g. technology)" required>
+                <input type="url" id="new-url" placeholder="https://example.com/rss" required>
+                <button type="submit" class="refresh-btn">Add Feed</button>
+            </form>
+            <p id="add-feed-error" class="feeds-error"></p>
+        </section>
+
+        <section class="feeds-list-card">
+            <h2>Feeds &amp; Health</h2>
+            <div id="feeds-table-container">
+                <div class="loading">Loading feeds...</div>
+            </div>
+        </section>
+    </div>
+
+    <script src="/static/admin.js"></script>
+</body>
+</html>

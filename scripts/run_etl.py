@@ -67,6 +67,21 @@ def cleanup_old_articles():
         return 0
 
 
+def compute_stats():
+    """Roll up today's per-category ingestion counts for the admin stats dashboard."""
+    try:
+        from backend.database import SessionLocal
+        from backend.stats import compute_daily_stats
+
+        db = SessionLocal()
+        try:
+            compute_daily_stats(db)
+        finally:
+            db.close()
+    except Exception:
+        logger.exception("Error computing daily stats")
+
+
 def run_etl():
     """Run the complete ETL process."""
     logger.info("Starting ETL job at %s", datetime.utcnow().isoformat())
@@ -85,10 +100,9 @@ def run_etl():
         logger.exception("Database initialization warning")
 
     try:
-        # Fetch articles
-        feeds_path = Path(__file__).resolve().parent.parent / "etl" / "feeds.json"
+        # Fetch articles - prefers the DB-backed feeds table, falling back to feeds.json if empty
         logger.info("Fetching articles from feeds...")
-        df = fetch_all_articles(feeds_path)
+        df = fetch_all_articles()
 
         if df.empty:
             logger.warning("No articles fetched. Exiting.")
@@ -104,6 +118,9 @@ def run_etl():
 
         # Cleanup old articles
         cleanup_old_articles()
+
+        # Roll up today's per-category counts for the admin stats dashboard
+        compute_stats()
 
         logger.info("ETL job complete. Processed %d articles, inserted %d new ones.", len(df_clean), count)
         return 0

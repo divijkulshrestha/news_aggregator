@@ -22,7 +22,7 @@ security/correctness surface)
 | 4 | [CORS wildcard origin with credentials](#4-cors-wildcard-origin-with-credentials) | Medium | Open |
 | 5 | [Unauthenticated + duplicated cleanup logic](#5-unauthenticated--duplicated-cleanup-logic) | Medium | Fixed |
 | 6 | [Hardcoded default DB credentials](#6-hardcoded-default-db-credentials) | Medium | Fixed |
-| 7 | [No structured logging in backend](#7-no-structured-logging-in-backend) | Low | Open |
+| 7 | [No structured logging in backend](#7-no-structured-logging-in-backend) | Low | Fixed |
 | 8 | [Row-by-row dedup instead of bulk upsert](#8-row-by-row-dedup-instead-of-bulk-upsert) | Low | Fixed |
 | 9 | [Inline per-function imports; incomplete type hints](#9-inline-per-function-imports-incomplete-type-hints) | Low | Fixed |
 

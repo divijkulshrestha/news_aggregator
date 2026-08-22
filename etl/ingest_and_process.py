@@ -33,8 +33,9 @@ def load_feeds_from_db() -> List[Dict[str, any]]:
     """Load enabled feeds from the database, grouped by category.
 
     Returns:
-        List of dicts with 'category' and 'urls' keys, or [] if the table
-        is empty / unavailable (caller should fall back to feeds.json).
+        List of dicts with 'category' and 'urls' keys, where each entry in 'urls'
+        is a dict {'url': str, 'feed_id': int}, or [] if the table is empty /
+        unavailable (caller should fall back to feeds.json).
     """
     try:
         from backend.database import Feed, SessionLocal
@@ -44,9 +45,9 @@ def load_feeds_from_db() -> List[Dict[str, any]]:
     db = SessionLocal()
     try:
         feeds = db.query(Feed).filter(Feed.enabled.is_(True)).order_by(Feed.category).all()
-        grouped: Dict[str, List[str]] = {}
+        grouped: Dict[str, List[dict]] = {}
         for feed in feeds:
-            grouped.setdefault(feed.category, []).append(feed.url)
+            grouped.setdefault(feed.category, []).append({"url": feed.url, "feed_id": feed.id})
         return [{"category": cat, "urls": urls} for cat, urls in grouped.items()]
     except Exception:
         return []
@@ -86,8 +87,39 @@ def load_feed_urls(feeds_file: str | Path = None) -> List[str]:
     feeds = load_categorized_feeds(feeds_file)
     all_urls = []
     for feed in feeds:
-        all_urls.extend(feed.get("urls", []))
+        for entry in feed.get("urls", []):
+            all_urls.append(entry["url"] if isinstance(entry, dict) else entry)
     return all_urls
+
+
+def record_feed_run(feed_id: int, success: bool, articles_fetched: int = 0, error_message: str = None) -> None:
+    """Record the outcome of a single feed fetch attempt for health monitoring.
+
+    No-ops (with a debug log) if the DB is unavailable or feed_id is None
+    (e.g. feeds loaded from feeds.json have no DB-backed Feed row to attribute the run to).
+    """
+    if feed_id is None:
+        return
+
+    try:
+        from backend.database import FeedRun, SessionLocal
+    except ImportError:
+        return
+
+    db = SessionLocal()
+    try:
+        db.add(FeedRun(
+            feed_id=feed_id,
+            success=success,
+            articles_fetched=articles_fetched,
+            error_message=(error_message[:2000] if error_message else None),
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Error recording feed run for feed_id=%s", feed_id)
+    finally:
+        db.close()
 
 
 def _clean_html(text: str) -> str:
@@ -105,18 +137,20 @@ def _clean_html(text: str) -> str:
     return cleaned
 
 
-def fetch_feed_entries(url: str, category: str = "general", timeout: int = 15) -> List[dict]:
+def fetch_feed_entries(url: str, category: str = "general", timeout: int = 15, feed_id: int = None) -> List[dict]:
     """Fetch entries from an RSS feed.
-    
+
     Args:
         url: RSS feed URL
         category: Category tag for the articles
         timeout: Request timeout in seconds
+        feed_id: DB id of the Feed row this URL came from, for health tracking (None if not DB-backed)
     """
     try:
         validate_feed_url(url)
     except UnsafeFeedUrlError as e:
         logger.warning("Refusing to fetch %s: %s", url, e)
+        record_feed_run(feed_id, success=False, error_message=str(e))
         return []
 
     headers = {
@@ -131,9 +165,11 @@ def fetch_feed_entries(url: str, category: str = "general", timeout: int = 15) -
         resp.raise_for_status()
     except UnsafeFeedUrlError as e:
         logger.warning("Refusing to follow redirect for %s: %s", url, e)
+        record_feed_run(feed_id, success=False, error_message=str(e))
         return []
-    except Exception:
+    except Exception as e:
         logger.exception("Error fetching %s", url)
+        record_feed_run(feed_id, success=False, error_message=str(e))
         return []
 
     feed = feedparser.parse(resp.content)
@@ -152,6 +188,8 @@ def fetch_feed_entries(url: str, category: str = "general", timeout: int = 15) -
             "published_raw": published,
             "summary": _clean_html(summary),
         })
+
+    record_feed_run(feed_id, success=True, articles_fetched=len(entries))
     return entries
 
 
@@ -167,10 +205,14 @@ def fetch_all_articles(feeds_file: str | Path = None) -> pd.DataFrame:
     for feed in feeds:
         category = feed.get("category", "general")
         urls = feed.get("urls", [])
-        
-        for url in urls:
+
+        for entry in urls:
+            if isinstance(entry, dict):
+                url, feed_id = entry["url"], entry.get("feed_id")
+            else:
+                url, feed_id = entry, None
             logger.info("Fetching [%s]: %s", category, url)
-            all_entries.extend(fetch_feed_entries(url, category))
+            all_entries.extend(fetch_feed_entries(url, category, feed_id=feed_id))
     
     if not all_entries:
         return pd.DataFrame(columns=["category", "source_url", "title", "link", "published_raw", "summary"])

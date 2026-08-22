@@ -15,7 +15,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.database import get_db, Article, Bookmark, Feed, ReadHistory, init_db
+from backend.database import get_db, Article, Bookmark, Feed, FeedRun, DailyStats, ReadHistory, init_db
 from backend.logging_config import setup_logging
 from url_safety import validate_feed_url, UnsafeFeedUrlError
 
@@ -82,6 +82,30 @@ class FeedResponse(BaseModel):
         from_attributes = True
 
 
+class StatsOverviewResponse(BaseModel):
+    total_articles: int
+    articles_today: int
+    category_counts_7d: Dict[str, int]
+    category_counts_30d: Dict[str, int]
+    last_successful_run: Optional[datetime]
+
+
+class FeedHealthResponse(BaseModel):
+    id: int
+    category: str
+    url: str
+    enabled: bool
+    last_run_at: Optional[datetime]
+    last_run_success: Optional[bool]
+    consecutive_failures: int
+    success_rate: Optional[float]
+
+
+class StatsTrendsResponse(BaseModel):
+    dates: List[str]
+    series: Dict[str, List[int]]
+
+
 @app.on_event("startup")
 async def startup_event() -> None:
     """Initialize database on startup."""
@@ -97,13 +121,24 @@ async def root() -> Union[FileResponse, Dict[str, str]]:
     return {"message": "Personal News Aggregator API", "docs": "/docs"}
 
 
-@app.get("/feeds.html", response_model=None)
-async def feeds_page() -> FileResponse:
-    """Serve the RSS feed management page."""
-    feeds_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "feeds.html")
-    if os.path.exists(feeds_path):
-        return FileResponse(feeds_path)
+@app.get("/admin.html", response_model=None)
+async def admin_page() -> FileResponse:
+    """Serve the admin panel (feed management + health/stats)."""
+    admin_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "admin.html")
+    if os.path.exists(admin_path):
+        return FileResponse(admin_path)
     raise HTTPException(status_code=404, detail="Not found")
+
+
+def _time_range_cutoff(time_range: str) -> datetime:
+    """Resolve a time_range query param ('1h', '1d', '7d') to a UTC cutoff datetime."""
+    now = datetime.utcnow()
+    time_filters = {
+        "1h": now - timedelta(hours=1),
+        "1d": now - timedelta(days=1),
+        "7d": now - timedelta(days=7),
+    }
+    return time_filters.get(time_range, time_filters["1d"])
 
 
 @app.get("/api/articles", response_model=List[ArticleResponse])
@@ -114,16 +149,8 @@ async def get_articles(
     db: Session = Depends(get_db)
 ) -> List[ArticleResponse]:
     """Get articles with optional filtering by category and time range."""
-    # Calculate time filter
-    now = datetime.utcnow()
-    time_filters = {
-        "1h": now - timedelta(hours=1),
-        "1d": now - timedelta(days=1),
-        "7d": now - timedelta(days=7),
-    }
-    
-    min_date = time_filters.get(time_range, time_filters["1d"])
-    
+    min_date = _time_range_cutoff(time_range)
+
     # Build query - filter by published_date if available, otherwise use ingestion_timestamp
     query = db.query(Article).filter(
         or_(
@@ -152,12 +179,23 @@ async def get_articles(
 
 
 @app.get("/api/categories")
-async def get_categories(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
-    """Get all available categories with article counts."""
-    categories = db.query(
-        Article.category,
-        func.count(Article.id).label("count")
-    ).group_by(Article.category).all()
+async def get_categories(
+    time_range: Optional[str] = Query(None, description="Time range: 1h, 1d, or 7d (omit for all-time)"),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """Get all available categories with article counts, optionally scoped to a time range."""
+    query = db.query(Article.category, func.count(Article.id).label("count"))
+
+    if time_range:
+        min_date = _time_range_cutoff(time_range)
+        query = query.filter(
+            or_(
+                and_(Article.published_date.isnot(None), Article.published_date >= min_date),
+                and_(Article.published_date.is_(None), Article.ingestion_timestamp >= min_date)
+            )
+        )
+
+    categories = query.group_by(Article.category).all()
 
     return [{"category": cat, "count": count} for cat, count in categories]
 
@@ -334,6 +372,108 @@ async def delete_feed(feed_id: int, db: Session = Depends(get_db)) -> Dict[str, 
     if not deleted:
         raise HTTPException(status_code=404, detail="Feed not found")
     return {"message": "Feed deleted"}
+
+
+# --- Admin: Health & Stats ---
+
+@app.get("/api/admin/stats/overview", response_model=StatsOverviewResponse)
+async def get_stats_overview(db: Session = Depends(get_db)) -> StatsOverviewResponse:
+    """Rollup stats for the admin dashboard: totals, today's count, and category trends."""
+    total_articles = db.query(func.count(Article.id)).scalar()
+
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    articles_today = db.query(func.count(Article.id)).filter(
+        Article.ingestion_timestamp >= today
+    ).scalar()
+
+    def category_counts_since(days: int) -> Dict[str, int]:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        rows = (
+            db.query(DailyStats.category, func.sum(DailyStats.articles_ingested))
+            .filter(DailyStats.date >= cutoff)
+            .group_by(DailyStats.category)
+            .all()
+        )
+        return {category: int(total) for category, total in rows}
+
+    last_run = db.query(func.max(FeedRun.run_at)).filter(FeedRun.success.is_(True)).scalar()
+
+    return StatsOverviewResponse(
+        total_articles=total_articles,
+        articles_today=articles_today,
+        category_counts_7d=category_counts_since(7),
+        category_counts_30d=category_counts_since(30),
+        last_successful_run=last_run,
+    )
+
+
+@app.get("/api/admin/stats/trends", response_model=StatsTrendsResponse)
+async def get_stats_trends(
+    days: int = Query(30, ge=1, le=90, description="Number of days of history to return"),
+    db: Session = Depends(get_db)
+) -> StatsTrendsResponse:
+    """Daily per-category article counts for the last N days, for the admin trends chart."""
+    start_date = (datetime.utcnow() - timedelta(days=days - 1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+    rows = (
+        db.query(DailyStats.date, DailyStats.category, DailyStats.articles_ingested)
+        .filter(DailyStats.date >= start_date)
+        .order_by(DailyStats.date)
+        .all()
+    )
+
+    dates = [(start_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days)]
+    categories = sorted({category for _, category, _ in rows})
+    series = {category: [0] * days for category in categories}
+
+    for date, category, count in rows:
+        day_index = (date - start_date).days
+        if 0 <= day_index < days:
+            series[category][day_index] = count
+
+    return StatsTrendsResponse(dates=dates, series=series)
+
+
+@app.get("/api/admin/feeds/health", response_model=List[FeedHealthResponse])
+async def get_feeds_health(db: Session = Depends(get_db)) -> List[FeedHealthResponse]:
+    """Per-feed health: last run status, consecutive failures, and rolling success rate."""
+    feeds = db.query(Feed).order_by(Feed.category, Feed.url).all()
+
+    results = []
+    for feed in feeds:
+        recent_runs = (
+            db.query(FeedRun)
+            .filter(FeedRun.feed_id == feed.id)
+            .order_by(desc(FeedRun.run_at))
+            .limit(20)
+            .all()
+        )
+
+        consecutive_failures = 0
+        for run in recent_runs:
+            if run.success:
+                break
+            consecutive_failures += 1
+
+        success_rate = (
+            sum(1 for r in recent_runs if r.success) / len(recent_runs)
+            if recent_runs else None
+        )
+
+        results.append(FeedHealthResponse(
+            id=feed.id,
+            category=feed.category,
+            url=feed.url,
+            enabled=feed.enabled,
+            last_run_at=recent_runs[0].run_at if recent_runs else None,
+            last_run_success=recent_runs[0].success if recent_runs else None,
+            consecutive_failures=consecutive_failures,
+            success_rate=success_rate,
+        ))
+
+    return results
 
 
 # Mount static files for frontend

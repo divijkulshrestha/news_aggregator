@@ -1,5 +1,5 @@
 """Database connection and models for news aggregation platform."""
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -85,6 +85,37 @@ class Feed(Base):
 
     def __repr__(self):
         return f"<Feed(category={self.category}, url={self.url})>"
+
+
+class FeedRun(Base):
+    """Records the outcome of a single feed fetch attempt during an ETL run."""
+    __tablename__ = "feed_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    feed_id = Column(Integer, ForeignKey("feeds.id", ondelete="CASCADE"), nullable=False, index=True)
+    run_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    success = Column(Boolean, nullable=False)
+    articles_fetched = Column(Integer, nullable=False, default=0)
+    error_message = Column(Text)
+
+    feed = relationship("Feed")
+
+    def __repr__(self):
+        return f"<FeedRun(feed_id={self.feed_id}, success={self.success}, run_at={self.run_at})>"
+
+
+class DailyStats(Base):
+    """Daily rollup of ingested article counts per category."""
+    __tablename__ = "daily_stats"
+    __table_args__ = (UniqueConstraint("date", "category", name="uq_daily_stats_date_category"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(DateTime, nullable=False, index=True)
+    category = Column(String(50), nullable=False, index=True)
+    articles_ingested = Column(Integer, nullable=False, default=0)
+
+    def __repr__(self):
+        return f"<DailyStats(date={self.date}, category={self.category}, articles_ingested={self.articles_ingested})>"
 
 
 def get_db():

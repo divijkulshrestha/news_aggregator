@@ -16,8 +16,10 @@ ENV/
 *.swo
 *~
 
-# CoPilot
+# Agents
 .github/
+.claude/
+CLAUDE.md
 
 # Environment variables
 .env
